@@ -24,10 +24,10 @@ Google servislerine ihtiyaç duymayan, Android tablet ve Android TV için sade b
 
 Gereksinimler: Android Studio (Koala veya üstü), JDK 17.
 
-1. Projeyi Android Studio ile açın. Gradle 8.7'yi kendisi indirir.
+1. Projeyi Android Studio ile açın (Gradle wrapper dahildir, Gradle 8.7 otomatik indirilir).
 2. `Run` ile cihaza kurun veya komut satırından:
    ```
-   gradle assembleDebug
+   ./gradlew assembleDebug
    ```
    APK: `app/build/outputs/apk/debug/`
 
