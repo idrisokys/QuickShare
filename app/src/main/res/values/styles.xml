@@ -1,0 +1,4 @@
+<resources>
+    <style name="T" parent="android:Theme.Material.NoActionBar" />
+    <style name="D" parent="android:Theme.Material.Dialog" />
+</resources>
