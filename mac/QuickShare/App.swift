@@ -128,7 +128,15 @@ struct ContentView: View {
             .frame(maxHeight: .infinity)
 
             Text(s.status.isEmpty ? L("hint") : s.status)
-                .font(.caption).foregroundColor(.secondary).lineLimit(2)
+                .font(.caption).foregroundColor(s.savedURL != nil ? .accentColor : .secondary).lineLimit(2)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // "Kaydedildi" yazısına tıklayınca klasörü aç, dosyayı seçili göster.
+                    if let u = s.savedURL { NSWorkspace.shared.activateFileViewerSelecting([u]) }
+                }
+                .onHover { inside in
+                    if s.savedURL != nil { if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                }
             if s.pct >= 0 { ProgressView(value: s.pct, total: 100) }
 
             Button(action: { s.pickFiles() }) {

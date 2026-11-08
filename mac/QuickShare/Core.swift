@@ -111,6 +111,8 @@ final class Store: ObservableObject {
     @Published var trusted: [String: String]
     @Published var status = ""
     @Published var pct = -1.0
+    /// Son kaydedilen dosya; durum yazısına tıklanınca klasörü açmak için.
+    @Published var savedURL: URL?
 
     private let lock = NSLock()
     private var fps = Set<String>()
@@ -139,8 +141,8 @@ final class Store: ObservableObject {
         lock.lock(); fps = Set(trusted.keys); lock.unlock()
     }
 
-    func post(_ s: String, _ p: Double = -1) {
-        DispatchQueue.main.async { self.status = s; self.pct = p }
+    func post(_ s: String, _ p: Double = -1, saved: URL? = nil) {
+        DispatchQueue.main.async { self.status = s; self.pct = p; self.savedURL = saved }
     }
 
     var rows: [Row] {

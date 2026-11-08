@@ -80,7 +80,10 @@ class MainActivity : Activity() {
         }
         root.addView(lv, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        st = TextView(this).apply { textSize = 16f; setTextColor(0xFFBBBBBB.toInt()); setPadding(0, dp(8), 0, dp(8)) }
+        st = TextView(this).apply {
+            textSize = 16f; setTextColor(0xFFBBBBBB.toInt()); setPadding(0, dp(8), 0, dp(8))
+            setOnClickListener { if (Bus.saved) openSavedFolder() }
+        }
         root.addView(st)
         bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
         root.addView(bar)
@@ -117,6 +120,7 @@ class MainActivity : Activity() {
         rows = ps.map { Row(it.fp, it.name, t.containsKey(it.fp), true) } +
             t.filter { (k, _) -> ps.none { it.fp == k } }.map { Row(it.key, it.value, true, false) }
         (lv.adapter as BaseAdapter).notifyDataSetChanged()
+        st.setTextColor(if (Bus.saved) 0xFF4FC3F7.toInt() else 0xFFBBBBBB.toInt())
         st.text = when {
             Bus.status.isNotEmpty() -> Bus.status
             rows.isEmpty() -> getString(R.string.searching)
@@ -124,6 +128,19 @@ class MainActivity : Activity() {
         }
         bar.visibility = if (Bus.pct >= 0) View.VISIBLE else View.INVISIBLE
         bar.progress = Bus.pct.coerceAtLeast(0)
+    }
+
+    /** Download/QuickShare klasörünü dosya yöneticisinde açar. */
+    private fun openSavedFolder() {
+        val dir = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload%2FQuickShare")
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW)
+                .setDataAndType(dir, "vnd.android.document/directory")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            try { startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            catch (e2: Exception) { }
+        }
     }
 
     override fun onStart() { super.onStart(); Bus.listener = { refresh() }; refresh() }

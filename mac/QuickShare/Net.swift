@@ -146,7 +146,7 @@ final class Receiver {
         finished = true
         try? fh?.close()
         if !ok, let p = path { try? FileManager.default.removeItem(at: p) }
-        if path != nil { Store.shared.post(ok ? L("saved", name) : L("recv_partial")) }
+        if path != nil { Store.shared.post(ok ? L("saved", name) : L("recv_partial"), saved: ok ? path : nil) }
         if reply {
             let st = ok ? "200 OK" : "500 Error"
             let resp = Data("HTTP/1.1 \(st)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)

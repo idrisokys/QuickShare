@@ -173,7 +173,7 @@ class Receiver(private val ctx: Context) {
                     } else cr.delete(uri, null, null)
                 }
                 reply(s, if (ok) "200 OK" else "500 Error")
-                Bus.set(if (ok) ctx.getString(R.string.saved, clean) else ctx.getString(R.string.recv_partial))
+                Bus.set(if (ok) ctx.getString(R.string.saved, clean) else ctx.getString(R.string.recv_partial), -1, ok)
             } catch (e: Exception) {
                 Bus.set(ctx.getString(R.string.recv_error))
             }

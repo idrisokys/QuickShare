@@ -33,8 +33,10 @@ object Bus {
     @Volatile var listener: (() -> Unit)? = null
     @Volatile var status = ""
     @Volatile var pct = -1
+    /** true ise durum yazısı "Kaydedildi" mesajıdır; tıklayınca klasör açılır. */
+    @Volatile var saved = false
     fun changed() { h.post { listener?.invoke() } }
-    fun set(s: String, p: Int = -1) { status = s; pct = p; changed() }
+    fun set(s: String, p: Int = -1, saved: Boolean = false) { status = s; pct = p; this.saved = saved; changed() }
 }
 
 /** Ağda bulunan cihazlar. */
