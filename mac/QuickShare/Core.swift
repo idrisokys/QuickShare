@@ -42,10 +42,22 @@ enum Identity {
 
         let data = try Data(contentsOf: p12)
         var items: CFArray?
-        let opts: [String: Any] = [
-            kSecImportExportPassphrase as String: pass,
-            kSecImportToMemoryOnly as String: true,
-        ]
+        var opts: [String: Any] = [kSecImportExportPassphrase as String: pass]
+        if #available(macOS 15.0, *) {
+            // Anahtar sadece bellekte tutulur, Anahtar Zinciri'ne yazılmaz.
+            opts[kSecImportToMemoryOnly as String] = true
+        } else {
+            // Eski macOS: her açılışta geçici, özel bir anahtar zinciri kullan.
+            let kcDir = dir.appendingPathComponent("kc")
+            try? fm.removeItem(at: kcDir)
+            try fm.createDirectory(at: kcDir, withIntermediateDirectories: true)
+            let kcPass = UUID().uuidString
+            var kc: SecKeychain?
+            let r = SecKeychainCreate(kcDir.appendingPathComponent("tmp.keychain").path,
+                                      UInt32(kcPass.utf8.count), kcPass, false, nil, &kc)
+            guard r == errSecSuccess, let kc else { throw QSError("Geçici anahtar zinciri açılamadı (\(r))") }
+            opts[kSecImportExportKeychain as String] = kc
+        }
         let st = SecPKCS12Import(data as CFData, opts as CFDictionary, &items)
         guard st == errSecSuccess,
               let arr = items as? [[String: Any]],
