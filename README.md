@@ -1,67 +1,37 @@
 # Hızlı Paylaş (QuickShare)
 
-Google servislerine ihtiyaç duymayan, Android tablet ve Android TV için sade bir yerel dosya paylaşım uygulaması. Aynı Wi-Fi/Ethernet ağındaki cihazlar birbirini otomatik bulur, dosyalar doğrudan cihazdan cihaza gider. Bulut yok, hesap yok.
+Google servislerine bağlı olmayan, yerel ağda çalışan sade dosya paylaşım uygulaması. Android tablet, Android TV ve Mac aynı protokolü konuşur, birbirlerine doğrudan dosya gönderir. Bulut ve hesap yoktur.
 
-## Özellikler
+| Klasör | Platform | Açıklama |
+|---|---|---|
+| [`android/`](android) | Android 10+ (tablet, TV) | Tek ekran, dokunmatik ve kumanda desteği, paylaş menüsü |
+| [`mac/`](mac) | macOS 13+ | Menü çubuğu uygulaması (300x450 pencere), paylaş menüsü, açılışta başlat |
 
-- **Google'dan bağımsız:** Play Services, Nearby veya Quick Share gerektirmez. Sadece Android'in kendi API'leri kullanılır.
-- **Güvenilir cihaz listesi:** Yakındaki cihaza dokununca listeye eklenir. QR kod ve PIN yoktur.
-- **Otomatik kabul:** Güvenilir cihazdan gelen dosyalar sormadan kaydedilir. Bilinmeyen cihazlar sessizce reddedilir.
-- **Akıllı gönderim:** Güvenilir cihazlardan sadece biri çevrimiçiyse dosya doğrudan ona gider. Birden fazlaysa liste çıkar ve son kullanılan seçili gelir.
-- **Paylaş menüsü:** Uygulama sistemin paylaş menüsünde görünür. Güvenilir cihazlar menüde doğrudan hedef olarak çıkar.
-- **Tablet ve TV:** Tek ekran, dokunmatik ve kumanda (D-pad) ile kullanılır. TV başlatıcısında (Leanback) görünür.
-- **Güvenli aktarım:** TLS ile şifreli. Cihazlar sertifika parmak iziyle tanınır, ad veya IP taklidi işe yaramaz.
+## Ortak özellikler
 
-## Kullanım
+- **Güvenilir cihaz listesi:** Yakındaki cihaza dokununca eklenir. QR kod ve PIN yoktur.
+- **Otomatik kabul:** Güvenilir cihazdan gelen dosya sormadan kaydedilir, bilinmeyen cihazlar reddedilir.
+- **Akıllı gönderim:** Tek güvenilir cihaz varsa dosya doğrudan ona gider.
+- **Şifreli:** TLS ve sertifika parmak iziyle cihaz doğrulama.
+- **Paylaş menüsü:** Her iki platformda sistemin paylaş menüsünde görünür.
 
-1. Uygulamayı iki cihaza da kurun ve açın. Uygulama açıkken dosya almaya hazırdır, kapanınca dinleme durur.
-2. Her cihazda, listede görünen diğer cihaza **bir kez dokunun** (kumandada OK). Güven tek yönlüdür, yani iki cihazın da birbirini eklemesi gerekir.
-3. **Dosya seç** ile veya başka bir uygulamanın paylaş menüsünden dosya gönderin.
-4. Alınan dosyalar `Download/QuickShare` klasörüne kaydedilir.
-5. Listeden çıkarmak için güvenilir cihaza **uzun basın**.
+## Protokol (kısaca)
+
+- Keşif: mDNS, servis tipi `_qshare._tcp`, TXT kayıtları `n` (cihaz adı) ve `f` (sertifika SHA-256 parmak izi).
+- Aktarım: karşılıklı TLS. Tek bir `POST /u` isteği, dosya adı `X-Name` başlığında (URL kodlu), gövde ham dosya.
+- Güven: sertifikanın DER SHA-256 parmak izi güvenilir listedeyse kabul edilir. Güven tek yönlüdür, iki cihaz da birbirini eklemelidir.
 
 ## Derleme
 
-Gereksinimler: Android Studio (Koala veya üstü), JDK 17.
+Her platformun kendi README'sine bakın: [android/README.md](android/README.md), [mac/README.md](mac/README.md).
 
-1. Projeyi Android Studio ile açın (Gradle wrapper dahildir, Gradle 8.7 otomatik indirilir).
-2. `Run` ile cihaza kurun veya komut satırından:
-   ```
-   ./gradlew assembleDebug
-   ```
-   APK: `app/build/outputs/apk/debug/`
+GitHub Actions iki workflow içerir (`.github/workflows/`):
 
-### GitHub Actions
+- `android.yml`: APK derler, `QuickShare-android.apk` olarak yükler.
+- `mac.yml`: macOS uygulamasını derler, `QuickShare-mac.zip` olarak yükler.
 
-`.github/workflows/build.yml` her push ve pull request'te debug APK derler ve çıktıyı **Actions → Artifacts** altına yükler. `v1.0` gibi bir etiket (`git tag v1.0 && git push --tags`) gönderirseniz APK ayrıca **Releases** sayfasına eklenir.
+`v1.0` gibi bir etiket gönderirseniz (`git tag v1.0 && git push --tags`) ikisi de **Releases** sayfasına eklenir.
 
-## Gereksinimler
+## Not
 
-- Android 10 (API 29) ve üstü
-- Cihazların aynı yerel ağda olması (şimdilik)
-
-## Nasıl çalışır
-
-| Parça | Görev |
-|---|---|
-| `Discovery` | `NsdManager` (mDNS) ile cihazı duyurur ve çevredekileri bulur |
-| `Receiver` | TLS sunucu. Gelen dosyayı, gönderenin parmak izi güvenilirse `MediaStore.Downloads` altına yazar |
-| `Sender` | Dosyayı TLS üzerinden akış halinde (1 MB tampon) gönderir, karşı cihazın parmak izini doğrular |
-| `Identity` | AndroidKeyStore içinde EC anahtar ve self-signed sertifika üretir |
-| `Trust` | Güvenilir cihazları (parmak izi → ad) saklar |
-| `ReceiverService` | Uygulama açıkken dinlemeyi sürdüren foreground service |
-| `ShareActivity` | Sistem paylaş menüsü girişi |
-
-Aktarım protokolü basittir: tek bir `POST /u` isteği, dosya adı `X-Name` başlığında, gövde ham dosya.
-
-## Güvenlik notları
-
-- Dosyalar yalnızca `Download/QuickShare` klasörüne yazılır, otomatik açılmaz veya kurulmaz. Dosya adlarındaki yol karakterleri temizlenir.
-- Güvenilir bir cihazdan gelen dosya sorulmadan kaydedilir. Sadece tanıdığınız cihazları ekleyin ve misafir/halka açık ağlarda kullanmayın.
-
-## Yol haritası
-
-- [ ] Kayıt klasörü seçimi
-- [ ] Bluetooth LE ile keşif (ağ olmadan bulma)
-- [ ] Wi-Fi Direct ile ağsız yüksek hızlı aktarım
-- [ ] Paralel bağlantılarla daha hızlı aktarım
+Kod, derleme ortamı olmadan yazıldı. İlk derlemede küçük hatalar çıkabilir.

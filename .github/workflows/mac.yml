@@ -1,0 +1,51 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen kur
+        run: |
+          n=0
+          until brew install xcodegen; do
+            n=$((n+1)); [ "$n" -ge 3 ] && exit 1
+            sleep 20
+          done
+
+      - name: Xcode projesini üret
+        run: xcodegen generate
+
+      - name: Derle
+        run: |
+          xcodebuild -project QuickShare.xcodeproj -scheme QuickShare \
+            -configuration Release -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" build
+
+      - name: Zip
+        run: ditto -c -k --keepParent build/Build/Products/Release/QuickShare.app QuickShare-mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuickShare-mac
+          path: mac/QuickShare-mac.zip
+
+      - name: Sürüme ekle (v* etiketi)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mac/QuickShare-mac.zip

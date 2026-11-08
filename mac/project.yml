@@ -1,0 +1,58 @@
+name: QuickShare
+options:
+  bundleIdPrefix: io.qs
+  deploymentTarget:
+    macOS: "13.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: NO
+targets:
+  QuickShare:
+    type: application
+    platform: macOS
+    sources: [QuickShare]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.qs.share.mac
+    dependencies:
+      - target: ShareExt
+        embed: true
+    info:
+      path: QuickShare/Info.plist
+      properties:
+        CFBundleDisplayName: Hızlı Paylaş
+        LSUIElement: true
+        LSMinimumSystemVersion: "13.0"
+        NSLocalNetworkUsageDescription: Yakındaki cihazları bulmak ve dosya paylaşmak için gerekli.
+        NSBonjourServices:
+          - _qshare._tcp
+        CFBundleURLTypes:
+          - CFBundleURLName: io.qs.share.mac
+            CFBundleURLSchemes:
+              - quickshare
+  ShareExt:
+    type: app-extension
+    platform: macOS
+    sources: [ShareExt]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.qs.share.mac.ShareExt
+    entitlements:
+      path: ShareExt/ShareExt.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+    info:
+      path: ShareExt/Info.plist
+      properties:
+        CFBundleDisplayName: Hızlı Paylaş
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsFileWithMaxCount: 20
