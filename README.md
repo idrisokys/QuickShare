@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/cc4fec16-ab7f-4255-b4e2-6d728996a795
+
 # QuickShare
 
 [Türkçe](README.tr.md)
