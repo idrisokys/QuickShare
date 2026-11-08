@@ -3,6 +3,11 @@ import Security
 import CryptoKit
 import Network
 
+/// Yerelleştirilmiş metin (en / tr).
+func L(_ key: String, _ args: CVarArg...) -> String {
+    String(format: NSLocalizedString(key, comment: ""), arguments: args)
+}
+
 struct QSError: LocalizedError {
     let m: String
     init(_ m: String) { self.m = m }
@@ -55,19 +60,19 @@ enum Identity {
             var kc: SecKeychain?
             let r = SecKeychainCreate(kcDir.appendingPathComponent("tmp.keychain").path,
                                       UInt32(kcPass.utf8.count), kcPass, false, nil, &kc)
-            guard r == errSecSuccess, let kc else { throw QSError("Geçici anahtar zinciri açılamadı (\(r))") }
+            guard r == errSecSuccess, let kc else { throw QSError(L("err_keychain", r)) }
             opts[kSecImportExportKeychain as String] = kc
         }
         let st = SecPKCS12Import(data as CFData, opts as CFDictionary, &items)
         guard st == errSecSuccess,
               let arr = items as? [[String: Any]],
               let any = arr.first?[kSecImportItemIdentity as String]
-        else { throw QSError("Kimlik yüklenemedi (\(st))") }
+        else { throw QSError(L("err_identity", st)) }
         let id = any as! SecIdentity
         identity = id
         var cert: SecCertificate?
         SecIdentityCopyCertificate(id, &cert)
-        guard let cert else { throw QSError("Sertifika okunamadı") }
+        guard let cert else { throw QSError(L("err_cert_read")) }
         fp = sha256hex(SecCertificateCopyData(cert) as Data)
     }
 
@@ -79,7 +84,7 @@ enum Identity {
         p.standardError = FileHandle.nullDevice
         try p.run()
         p.waitUntilExit()
-        guard p.terminationStatus == 0 else { throw QSError("Sertifika üretilemedi") }
+        guard p.terminationStatus == 0 else { throw QSError(L("err_cert_gen")) }
     }
 }
 

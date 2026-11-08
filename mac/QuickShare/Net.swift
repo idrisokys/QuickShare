@@ -133,7 +133,7 @@ final class Receiver {
                 try? fh?.write(contentsOf: d)
                 got += d.count
                 let p = total > 0 ? got * 100 / total : 100
-                if p != lastPct { lastPct = p; Store.shared.post("Alınıyor: \(name)", Double(p)) }
+                if p != lastPct { lastPct = p; Store.shared.post(L("receiving", name), Double(p)) }
             }
             if got >= total { finish(true) }
             else if err != nil || eof { finish(false) }
@@ -146,7 +146,7 @@ final class Receiver {
         finished = true
         try? fh?.close()
         if !ok, let p = path { try? FileManager.default.removeItem(at: p) }
-        if path != nil { Store.shared.post(ok ? "Kaydedildi: \(name)" : "Alma yarım kaldı") }
+        if path != nil { Store.shared.post(ok ? L("saved", name) : L("recv_partial")) }
         if reply {
             let st = ok ? "200 OK" : "500 Error"
             let resp = Data("HTTP/1.1 \(st)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
@@ -172,11 +172,12 @@ final class Receiver {
 enum Sender {
     static func send(_ files: [URL], to p: Peer, done: @escaping (String) -> Void) {
         DispatchQueue.global().async {
-            var msg = "Gönderildi"
+            var msg = L("sent")
+            var ok = true
             for f in files {
-                do { try one(f, p) } catch { msg = "Hata: " + error.localizedDescription; break }
+                do { try one(f, p) } catch { ok = false; msg = L("error_fmt", error.localizedDescription); break }
             }
-            if msg == "Gönderildi" { DispatchQueue.main.async { Store.shared.last = p.fp } }
+            if ok { DispatchQueue.main.async { Store.shared.last = p.fp } }
             Store.shared.post(msg)
             done(msg)
         }
@@ -191,7 +192,7 @@ enum Sender {
         let c = NWConnection(to: p.endpoint, using: Net.shared.params { $0 == p.fp })
         let ready = DispatchSemaphore(value: 0)
         var isReady = false
-        var lastErr = "bağlantı kurulamadı"
+        var lastErr = L("err_nocon")
         c.stateUpdateHandler = { s in
             switch s {
             case .ready: isReady = true; ready.signal()
@@ -203,7 +204,7 @@ enum Sender {
         c.start(queue: Net.shared.q)
         if ready.wait(timeout: .now() + 15) == .timedOut || !isReady {
             c.cancel()
-            throw QSError("Bağlanılamadı veya cihaz doğrulanamadı (\(lastErr))")
+            throw QSError(L("err_connect", lastErr))
         }
         defer { c.cancel() }
 
@@ -224,7 +225,7 @@ enum Sender {
             try push(chunk)
             sent += Int64(chunk.count)
             let pc = size > 0 ? Int(sent * 100 / size) : 0
-            if pc != last { last = pc; Store.shared.post("Gönderiliyor: \(name)", Double(pc)) }
+            if pc != last { last = pc; Store.shared.post(L("sending", name), Double(pc)) }
         }
 
         let rs = DispatchSemaphore(value: 0)
@@ -233,10 +234,10 @@ enum Sender {
             resp = String(decoding: d ?? Data(), as: UTF8.self)
             rs.signal()
         }
-        if rs.wait(timeout: .now() + 30) == .timedOut { throw QSError("Yanıt gelmedi") }
+        if rs.wait(timeout: .now() + 30) == .timedOut { throw QSError(L("err_no_reply")) }
         guard resp.contains(" 200") else {
             throw QSError(resp.contains("403")
-                ? "Karşı cihaz kabul etmedi (güvenilir listesinde değilim)" : "Karşı cihaz hata verdi")
+                ? L("err_rejected") : L("err_remote"))
         }
     }
 }

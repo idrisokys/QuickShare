@@ -162,7 +162,7 @@ class Receiver(private val ctx: Context) {
                             out.write(b, 0, n)
                             left -= n
                             val p = ((len - left) * 100 / len).toInt()
-                            if (p != last) { last = p; Bus.set("Alınıyor: $clean", p) }
+                            if (p != last) { last = p; Bus.set(ctx.getString(R.string.receiving, clean), p) }
                         }
                         ok = left == 0L
                     }
@@ -173,9 +173,9 @@ class Receiver(private val ctx: Context) {
                     } else cr.delete(uri, null, null)
                 }
                 reply(s, if (ok) "200 OK" else "500 Error")
-                Bus.set(if (ok) "Kaydedildi: $clean" else "Alma yarım kaldı")
+                Bus.set(if (ok) ctx.getString(R.string.saved, clean) else ctx.getString(R.string.recv_partial))
             } catch (e: Exception) {
-                Bus.set("Alma hatası")
+                Bus.set(ctx.getString(R.string.recv_error))
             }
         }
     }
@@ -190,15 +190,15 @@ object Sender {
         }
         when {
             ps.isEmpty() -> {
-                Toast.makeText(a, "Güvenilir cihaz bulunamadı", Toast.LENGTH_LONG).show(); fin()
+                Toast.makeText(a, a.getString(R.string.no_trusted), Toast.LENGTH_LONG).show(); fin()
             }
             ps.size == 1 -> go(ps[0])
             else -> {
                 var sel = ps.indexOfFirst { it.fp == Trust.last }.coerceAtLeast(0)
-                AlertDialog.Builder(a).setTitle("Hangi cihaza?")
+                AlertDialog.Builder(a).setTitle(R.string.pick_device)
                     .setSingleChoiceItems(ps.map { it.name }.toTypedArray(), sel) { _, w -> sel = w }
-                    .setPositiveButton("Gönder") { _, _ -> go(ps[sel]) }
-                    .setNegativeButton("İptal") { _, _ -> fin() }
+                    .setPositiveButton(R.string.send) { _, _ -> go(ps[sel]) }
+                    .setNegativeButton(R.string.cancel) { _, _ -> fin() }
                     .setOnCancelListener { fin() }
                     .show()
             }
@@ -206,9 +206,15 @@ object Sender {
     }
 
     fun send(c: Context, p: Peer, uris: List<Uri>, done: (String) -> Unit) = thread {
-        var msg = "Gönderildi"
-        try { uris.forEach { one(c, p, it) } } catch (e: Exception) { msg = "Hata: " + (e.message ?: "bağlantı") }
-        if (msg == "Gönderildi") Trust.last = p.fp
+        var ok = true
+        var msg = c.getString(R.string.sent)
+        try {
+            uris.forEach { one(c, p, it) }
+        } catch (e: Exception) {
+            ok = false
+            msg = c.getString(R.string.error_fmt, e.message ?: c.getString(R.string.err_connection))
+        }
+        if (ok) Trust.last = p.fp
         Bus.set(msg)
         done(msg)
     }
@@ -222,16 +228,16 @@ object Sender {
                 if (i >= 0) name = it.getString(i)
             }
         }
-        val afd = cr.openAssetFileDescriptor(u, "r") ?: error("Dosya açılamadı")
+        val afd = cr.openAssetFileDescriptor(u, "r") ?: error(c.getString(R.string.err_open))
         val len = afd.length
-        require(len >= 0) { "Dosya boyutu bilinmiyor" }
+        require(len >= 0) { c.getString(R.string.err_size) }
         afd.createInputStream().use { ins ->
             (Identity.ssl.socketFactory.createSocket(p.host, p.port) as SSLSocket).use { s ->
                 s.tcpNoDelay = true
                 s.sendBufferSize = BUF
                 s.soTimeout = 30000
                 s.startHandshake()
-                require(Identity.fpOf(s.session.peerCertificates[0]) == p.fp) { "Cihaz doğrulanamadı" }
+                require(Identity.fpOf(s.session.peerCertificates[0]) == p.fp) { c.getString(R.string.err_verify) }
                 val out = s.outputStream
                 out.write(
                     ("POST /u HTTP/1.1\r\nX-Name: ${URLEncoder.encode(name, "UTF-8")}\r\n" +
@@ -246,11 +252,11 @@ object Sender {
                     out.write(b, 0, n)
                     sent += n
                     val pc = if (len > 0) (sent * 100 / len).toInt() else 0
-                    if (pc != last) { last = pc; Bus.set("Gönderiliyor: $name", pc) }
+                    if (pc != last) { last = pc; Bus.set(c.getString(R.string.sending, name), pc) }
                 }
                 out.flush()
                 val l = BufferedReader(InputStreamReader(s.inputStream)).readLine()
-                require(l?.contains(" 200") == true) { "Karşı cihaz kabul etmedi (güvenilir listesinde değilim)" }
+                require(l?.contains(" 200") == true) { c.getString(R.string.err_rejected) }
             }
         }
     }

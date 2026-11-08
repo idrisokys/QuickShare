@@ -40,7 +40,7 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFF111111.toInt())
         }
         root.addView(TextView(this).apply {
-            text = Identity.name + "  ·  hazır"
+            text = this@MainActivity.getString(R.string.ready, Identity.name)
             textSize = 24f
             setTextColor(Color.WHITE)
         })
@@ -57,7 +57,7 @@ class MainActivity : Activity() {
                     return ((v as? TextView) ?: TextView(this@MainActivity)).apply {
                         setPadding(dp(16), dp(16), dp(16), dp(16))
                         textSize = 20f
-                        text = (if (r.trusted) "✓ " else "") + r.name + (if (r.online) "" else "  (çevrimdışı)")
+                        text = (if (r.trusted) "✓ " else "") + r.name + (if (r.online) "" else "  " + this@MainActivity.getString(R.string.offline))
                         setTextColor(if (r.online) Color.WHITE else 0xFF888888.toInt())
                     }
                 }
@@ -66,14 +66,14 @@ class MainActivity : Activity() {
                 val r = rows[i]
                 if (!r.trusted) {
                     Trust.add(r.fp, r.name); Shortcuts.update(this@MainActivity)
-                    toast("Güvenilir cihaz eklendi"); refresh()
+                    toast(this@MainActivity.getString(R.string.added)); refresh()
                 }
             }
             setOnItemLongClickListener { _, _, i, _ ->
                 val r = rows[i]
                 if (r.trusted) {
                     Trust.del(r.fp); Shortcuts.update(this@MainActivity)
-                    toast("Listeden çıkarıldı"); refresh()
+                    toast(this@MainActivity.getString(R.string.removed)); refresh()
                 }
                 true
             }
@@ -86,7 +86,7 @@ class MainActivity : Activity() {
         root.addView(bar)
 
         val btn = Button(this).apply {
-            text = "Dosya seç"
+            setText(R.string.select_file)
             setOnClickListener {
                 startActivityForResult(
                     Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
@@ -119,8 +119,8 @@ class MainActivity : Activity() {
         (lv.adapter as BaseAdapter).notifyDataSetChanged()
         st.text = when {
             Bus.status.isNotEmpty() -> Bus.status
-            rows.isEmpty() -> "Yakındaki cihazlar aranıyor…"
-            else -> "Eklemek için dokun, silmek için uzun bas"
+            rows.isEmpty() -> getString(R.string.searching)
+            else -> getString(R.string.hint)
         }
         bar.visibility = if (Bus.pct >= 0) View.VISIBLE else View.INVISIBLE
         bar.progress = Bus.pct.coerceAtLeast(0)

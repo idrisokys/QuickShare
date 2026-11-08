@@ -111,7 +111,7 @@ object Shortcuts {
             val sm = c.getSystemService(ShortcutManager::class.java)
             sm.dynamicShortcuts = Trust.all().entries.take(4).map {
                 ShortcutInfo.Builder(c, it.key)
-                    .setShortLabel(it.value.ifBlank { "Cihaz" }.take(25))
+                    .setShortLabel(it.value.ifBlank { c.getString(R.string.device_default) }.take(25))
                     .setIcon(Icon.createWithResource(c, R.drawable.ic))
                     .setCategories(setOf("io.qs.TARGET"))
                     .setLongLived(true)

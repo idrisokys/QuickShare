@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hızlı Paylaş</string>
+    <string name="notif_channel">Bekleme</string>
+    <string name="notif_title">Gönderi bekleniyor</string>
+    <string name="ready">%1$s  ·  hazır</string>
+    <string name="select_file">Dosya seç</string>
+    <string name="searching">Yakındaki cihazlar aranıyor…</string>
+    <string name="hint">Eklemek için dokun, silmek için uzun bas</string>
+    <string name="offline">(çevrimdışı)</string>
+    <string name="added">Güvenilir cihaz eklendi</string>
+    <string name="removed">Listeden çıkarıldı</string>
+    <string name="device_default">Cihaz</string>
+    <string name="receiving">Alınıyor: %1$s</string>
+    <string name="saved">Kaydedildi: %1$s</string>
+    <string name="recv_partial">Alma yarım kaldı</string>
+    <string name="recv_error">Alma hatası</string>
+    <string name="sending">Gönderiliyor: %1$s</string>
+    <string name="sent">Gönderildi</string>
+    <string name="error_fmt">Hata: %1$s</string>
+    <string name="err_connection">bağlantı hatası</string>
+    <string name="no_trusted">Güvenilir cihaz bulunamadı</string>
+    <string name="pick_device">Hangi cihaza?</string>
+    <string name="send">Gönder</string>
+    <string name="cancel">İptal</string>
+    <string name="err_open">Dosya açılamadı</string>
+    <string name="err_size">Dosya boyutu bilinmiyor</string>
+    <string name="err_verify">Cihaz doğrulanamadı</string>
+    <string name="err_rejected">Karşı cihaz kabul etmedi (güvenilir listesinde değilim)</string>
+    <string name="share_searching">Cihazlar aranıyor…</string>
+</resources>

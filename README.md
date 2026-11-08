@@ -1,37 +1,61 @@
-# Hızlı Paylaş (QuickShare)
+# QuickShare
 
-Google servislerine bağlı olmayan, yerel ağda çalışan sade dosya paylaşım uygulaması. Android tablet, Android TV ve Mac aynı protokolü konuşur, birbirlerine doğrudan dosya gönderir. Bulut ve hesap yoktur.
+[Türkçe](README.tr.md)
 
-| Klasör | Platform | Açıklama |
+A simple, Google-free file sharing app for your local network. Send files between Android tablets, Android TVs and Macs without the cloud, accounts or PINs.
+
+The apps use the device language: **Turkish** on Turkish devices, **English** everywhere else.
+
+## Features
+
+- Works without Google Play Services
+- Trusted device list: tap a nearby device once to trust it
+- Files from trusted devices are accepted automatically
+- Sends straight to the device if only one trusted device is online
+- Appears in the system Share menu
+- Encrypted with TLS, devices are verified by certificate fingerprint
+
+| Folder | Platform | Notes |
 |---|---|---|
-| [`android/`](android) | Android 10+ (tablet, TV) | Tek ekran, dokunmatik ve kumanda desteği, paylaş menüsü |
-| [`mac/`](mac) | macOS 13+ | Menü çubuğu uygulaması (300x450 pencere), paylaş menüsü, açılışta başlat |
+| [`android/`](android) | Android 10+ (tablet, TV) | Touch and remote (D-pad) friendly, single screen |
+| [`mac/`](mac) | macOS 13+ | Menu bar app (300x450 window), hidden from the Dock, launch at login |
 
-## Ortak özellikler
+## How to use
 
-- **Güvenilir cihaz listesi:** Yakındaki cihaza dokununca eklenir. QR kod ve PIN yoktur.
-- **Otomatik kabul:** Güvenilir cihazdan gelen dosya sormadan kaydedilir, bilinmeyen cihazlar reddedilir.
-- **Akıllı gönderim:** Tek güvenilir cihaz varsa dosya doğrudan ona gider.
-- **Şifreli:** TLS ve sertifika parmak iziyle cihaz doğrulama.
-- **Paylaş menüsü:** Her iki platformda sistemin paylaş menüsünde görünür.
+1. Install and open the app on both devices (same network).
+2. On each device, tap the other one in the list to trust it. Trust works one way, so do it on both.
+3. Pick files with **Select files**, drag and drop (Mac), or use the Share menu.
 
-## Protokol (kısaca)
+Received files are saved to `Download/QuickShare` (Android) or `~/Downloads/QuickShare` (Mac).
 
-- Keşif: mDNS, servis tipi `_qshare._tcp`, TXT kayıtları `n` (cihaz adı) ve `f` (sertifika SHA-256 parmak izi).
-- Aktarım: karşılıklı TLS. Tek bir `POST /u` isteği, dosya adı `X-Name` başlığında (URL kodlu), gövde ham dosya.
-- Güven: sertifikanın DER SHA-256 parmak izi güvenilir listedeyse kabul edilir. Güven tek yönlüdür, iki cihaz da birbirini eklemelidir.
+## Build
 
-## Derleme
+**Android** (JDK 17, Android Studio or command line):
 
-Her platformun kendi README'sine bakın: [android/README.md](android/README.md), [mac/README.md](mac/README.md).
+```
+cd android
+./gradlew assembleDebug
+```
 
-GitHub Actions iki workflow içerir (`.github/workflows/`):
+**macOS** (Xcode 15+, [XcodeGen](https://github.com/yonaskolb/XcodeGen)):
 
-- `android.yml`: APK derler, `QuickShare-android.apk` olarak yükler.
-- `mac.yml`: macOS uygulamasını derler, `QuickShare-mac.zip` olarak yükler.
+```
+cd mac
+brew install xcodegen
+xcodegen generate
+open QuickShare.xcodeproj
+```
 
-`v1.0` gibi bir etiket gönderirseniz (`git tag v1.0 && git push --tags`) ikisi de **Releases** sayfasına eklenir.
+Enable the Share menu extension in *System Settings → Extensions → Sharing*. If macOS blocks a downloaded build, run `xattr -dr com.apple.quarantine /Applications/QuickShare.app`.
 
-## Not
+GitHub Actions builds both apps on every push. Push a tag like `v1.0` to attach the APK and the Mac app to a release.
 
-Kod, derleme ortamı olmadan yazıldı. İlk derlemede küçük hatalar çıkabilir.
+## How it works
+
+- Discovery: mDNS service `_qshare._tcp` with TXT records `n` (name) and `f` (certificate SHA-256 fingerprint)
+- Transfer: mutual TLS, one `POST /u` request per file (name in the `X-Name` header)
+- Trust: a sender is accepted only if its certificate fingerprint is in the trusted list
+
+## Security note
+
+Files from trusted devices are saved without asking. Only trust devices you know and avoid using the app on public networks.

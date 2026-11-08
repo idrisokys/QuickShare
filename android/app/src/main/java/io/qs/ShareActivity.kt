@@ -22,7 +22,7 @@ class ShareActivity : Activity() {
             else listOfNotNull(intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
         if (uris.isEmpty()) { finish(); return }
 
-        setContentView(TextView(this).apply { text = "Cihazlar aranıyor…"; textSize = 18f; setPadding(48, 48, 48, 48) })
+        setContentView(TextView(this).apply { setText(R.string.share_searching); textSize = 18f; setPadding(48, 48, 48, 48) })
         d = Discovery(this).also { it.browse() }
         Handler(Looper.getMainLooper()).postDelayed({
             if (!isFinishing) Sender.start(this, uris, intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID)) { finish() }

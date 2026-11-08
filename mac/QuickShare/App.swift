@@ -9,7 +9,7 @@ struct QuickShareApp: App {
 
     var body: some Scene {
         // Menü çubuğunda ikon; tıklayınca 300x450 pencere, dışına tıklayınca kapanır.
-        MenuBarExtra("Hızlı Paylaş", systemImage: "arrow.up.arrow.down.circle") {
+        MenuBarExtra(L("app_name"), systemImage: "arrow.up.arrow.down.circle") {
             ContentView()
         }
         .menuBarExtraStyle(.window)
@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         do { try Identity.setup(); try Net.shared.start() }
-        catch { Store.shared.post("Başlatılamadı: \(error.localizedDescription)") }
+        catch { Store.shared.post(L("start_failed", error.localizedDescription)) }
     }
 
     /// Paylaş menüsü eklentisi quickshare://send?p=/yol/dosya şeklinde çağırır.
@@ -54,7 +54,7 @@ extension Store {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     self.dispatch(files, confirm: confirm, tries: tries + 1)
                 }
-            } else { post("Güvenilir cihaz bulunamadı") }
+            } else { post(L("no_trusted")) }
             return
         }
         var target: Peer? = ps[0]
@@ -65,15 +65,15 @@ extension Store {
 
     private func choose(_ ps: [Peer], _ files: [URL], _ confirm: Bool) -> Peer? {
         let a = NSAlert()
-        a.messageText = confirm ? "\(files.count) dosya gönderilsin mi?" : "Hangi cihaza?"
+        a.messageText = confirm ? L("confirm_send", files.count) : L("which_device")
         a.informativeText = files.prefix(5).map { $0.lastPathComponent }.joined(separator: "\n")
             + (files.count > 5 ? "\n…" : "")
         let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26))
         pop.addItems(withTitles: ps.map { $0.name })
         if let i = ps.firstIndex(where: { $0.fp == last }) { pop.selectItem(at: i) }
         a.accessoryView = pop
-        a.addButton(withTitle: "Gönder")
-        a.addButton(withTitle: "İptal")
+        a.addButton(withTitle: L("send"))
+        a.addButton(withTitle: L("cancel"))
         NSApp.activate(ignoringOtherApps: true)
         return a.runModal() == .alertFirstButtonReturn ? ps[pop.indexOfSelectedItem] : nil
     }
@@ -100,7 +100,7 @@ struct ContentView: View {
                 Spacer()
                 Circle().fill(Color.green).frame(width: 8, height: 8)
             }
-            Text("Yakındaki cihazlar").font(.caption).foregroundColor(.secondary)
+            Text(L("nearby")).font(.caption).foregroundColor(.secondary)
 
             ScrollView {
                 VStack(spacing: 6) {
@@ -109,7 +109,7 @@ struct ContentView: View {
                             Image(systemName: r.trusted ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(r.trusted ? .accentColor : .secondary)
                             Text(r.name).foregroundColor(r.online ? .primary : .secondary).lineLimit(1)
-                            if !r.online { Text("çevrimdışı").font(.caption).foregroundColor(.secondary) }
+                            if !r.online { Text(L("offline")).font(.caption).foregroundColor(.secondary) }
                             Spacer()
                         }
                         .padding(8)
@@ -117,28 +117,28 @@ struct ContentView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { if !r.trusted && r.online { s.trust(r.fp, r.name) } }
                         .contextMenu {
-                            if r.trusted { Button("Listeden çıkar") { s.untrust(r.fp) } }
+                            if r.trusted { Button(L("remove")) { s.untrust(r.fp) } }
                         }
                     }
                     if s.rows.isEmpty {
-                        Text("Yakındaki cihazlar aranıyor…").font(.callout).foregroundColor(.secondary).padding(.top, 20)
+                        Text(L("searching")).font(.callout).foregroundColor(.secondary).padding(.top, 20)
                     }
                 }
             }
             .frame(maxHeight: .infinity)
 
-            Text(s.status.isEmpty ? "Eklemek için tıkla, silmek için sağ tıkla" : s.status)
+            Text(s.status.isEmpty ? L("hint") : s.status)
                 .font(.caption).foregroundColor(.secondary).lineLimit(2)
             if s.pct >= 0 { ProgressView(value: s.pct, total: 100) }
 
             Button(action: { s.pickFiles() }) {
-                Text("Dosya seç").frame(maxWidth: .infinity)
+                Text(L("select_file")).frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
 
             HStack {
-                Toggle("Açılışta başlat", isOn: Binding(
+                Toggle(L("launch_login"), isOn: Binding(
                     get: { launch },
                     set: { on in
                         launch = on
@@ -147,7 +147,7 @@ struct ContentView: View {
                     }))
                     .toggleStyle(.switch).controlSize(.small)
                 Spacer()
-                Button("Çık") { NSApp.terminate(nil) }
+                Button(L("quit")) { NSApp.terminate(nil) }
             }
         }
         .padding(16)
