@@ -92,6 +92,7 @@ extension Store {
 struct ContentView: View {
     @ObservedObject var s = Store.shared
     @State private var launch = SMAppService.mainApp.status == .enabled
+    @State private var showInfo = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -99,8 +100,11 @@ struct ContentView: View {
                 Text(Identity.name).font(.headline).lineLimit(1)
                 Spacer()
                 Circle().fill(Color.green).frame(width: 8, height: 8)
-                InfoButton()
+                Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
+                    .buttonStyle(.plain)
+                    .help(L("info"))
             }
+            if showInfo { InfoPanel() }
             Text(L("nearby")).font(.caption).foregroundColor(.secondary)
 
             ScrollView {
@@ -176,25 +180,22 @@ struct ContentView: View {
     }
 }
 
-/// Sağ üstteki bilgi (i) ikonu: küçük açılır kutu (resim, e-posta, GitHub linki).
-struct InfoButton: View {
-    @State private var shown = false
-
+/// Sağ üstteki bilgi (i) ikonu: ana görünümde açılıp kapanan küçük panel (resim, e-posta, GitHub linki).
+struct InfoPanel: View {
     var body: some View {
-        Button { shown.toggle() } label: { Image(systemName: "info.circle") }
-            .buttonStyle(.plain)
-            .help(L("info"))
-            .popover(isPresented: $shown, arrowEdge: .bottom) {
-                VStack(spacing: 4) {
-                    if let img = NSImage(named: "releases_icon") {
-                        Image(nsImage: img).resizable().scaledToFill()
-                            .frame(width: 36, height: 36).clipShape(Circle())
-                    }
-                    Text("sislivadi@gmail.com").textSelection(.enabled)
-                    Link("https://github.com/idrisokys/", destination: URL(string: "https://github.com/idrisokys/")!)
-                }
-                .font(.system(size: 11))
-                .padding(8)
+        HStack(spacing: 8) {
+            if let img = NSImage(named: "releases_icon") {
+                Image(nsImage: img).resizable().scaledToFill()
+                    .frame(width: 28, height: 28).clipShape(Circle())
             }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("sislivadi@gmail.com").textSelection(.enabled)
+                Link("https://github.com/idrisokys/", destination: URL(string: "https://github.com/idrisokys/")!)
+            }
+            .font(.system(size: 11))
+            Spacer(minLength: 0)
+        }
+        .padding(6)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
     }
 }

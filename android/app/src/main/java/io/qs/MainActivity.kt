@@ -17,7 +17,6 @@ import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.PopupWindow
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
@@ -48,6 +47,36 @@ class MainActivity : Activity() {
             setPadding(dp(24), dp(24), dp(24), dp(24))
             setBackgroundColor(0xFF111111.toInt())
         }
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = GradientDrawable().apply { setColor(0xFF2A2A2A.toInt()); cornerRadius = dp(10).toFloat() }
+        }
+        info.addView(ImageView(this).apply {
+            setImageResource(R.drawable.releases_icon)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(v: View, o: Outline) { o.setOval(0, 0, v.width, v.height) }
+            }
+            clipToOutline = true
+        }, LinearLayout.LayoutParams(dp(32), dp(32)))
+        val infoText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0) }
+        infoText.addView(TextView(this).apply {
+            text = "sislivadi@gmail.com"; textSize = 13f; setTextColor(Color.WHITE); setTextIsSelectable(true)
+        })
+        infoText.addView(TextView(this).apply {
+            text = "https://github.com/idrisokys/"; textSize = 13f
+            setTextColor(0xFF4FC3F7.toInt())
+            paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+            setOnClickListener {
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/idrisokys/"))) }
+                catch (e: Exception) { toast(getString(R.string.link_fail)) }
+            }
+        })
+        info.addView(infoText)
+
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(TextView(this).apply {
             text = this@MainActivity.getString(R.string.ready, Identity.name)
@@ -59,10 +88,11 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.TRANSPARENT)
             contentDescription = this@MainActivity.getString(R.string.info)
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            setOnClickListener { showInfo(this) }
+            setOnClickListener { info.visibility = if (info.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
         }
         header.addView(infoBtn, LinearLayout.LayoutParams(dp(44), dp(44)))
         root.addView(header)
+        root.addView(info, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(4); bottomMargin = dp(4) })
 
         lv = ListView(this).apply {
             divider = null
@@ -155,42 +185,6 @@ class MainActivity : Activity() {
         }
         try { startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         catch (e: Exception) { }
-    }
-
-    /** Sağ üstteki bilgi (i) ikonu: küçük açılır kutu (resim, e-posta, GitHub linki). */
-    private fun showInfo(anchor: View) {
-        val box = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = GradientDrawable().apply { setColor(0xFF2A2A2A.toInt()); cornerRadius = dp(10).toFloat() }
-        }
-        box.addView(ImageView(this).apply {
-            setImageResource(R.drawable.releases_icon)
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(v: View, o: Outline) { o.setOval(0, 0, v.width, v.height) }
-            }
-            clipToOutline = true
-        }, LinearLayout.LayoutParams(dp(36), dp(36)))
-        box.addView(TextView(this).apply {
-            text = "sislivadi@gmail.com"; textSize = 12f; setTextColor(Color.WHITE)
-            setTextIsSelectable(true); setPadding(0, dp(4), 0, 0)
-        })
-        val pw = PopupWindow(box, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
-        pw.elevation = dp(8).toFloat()
-        box.addView(TextView(this).apply {
-            text = "https://github.com/idrisokys/"; textSize = 12f
-            setTextColor(0xFF4FC3F7.toInt())
-            paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
-            setPadding(0, dp(2), 0, 0)
-            setOnClickListener {
-                pw.dismiss()
-                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/idrisokys/"))) }
-                catch (e: Exception) { toast(getString(R.string.link_fail)) }
-            }
-        })
-        pw.showAsDropDown(anchor, 0, 0, Gravity.END)
     }
 
     override fun onStart() { super.onStart(); Bus.listener = { refresh() }; refresh() }
