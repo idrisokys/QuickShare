@@ -118,3 +118,22 @@ object Shortcuts {
         } catch (e: Exception) { }
     }
 }
+
+/** Ana ekrana "QuickShare klasörü" kısayolunu ilk açılışta bir kez onaya sunar. */
+object FolderShortcut {
+    fun requestPinOnce(c: Context) {
+        try {
+            val pref = c.getSharedPreferences("qs", Context.MODE_PRIVATE)
+            if (pref.getBoolean("pin_asked", false)) return
+            pref.edit().putBoolean("pin_asked", true).apply()
+            val sm = c.getSystemService(ShortcutManager::class.java)
+            if (!sm.isRequestPinShortcutSupported) return
+            val si = ShortcutInfo.Builder(c, "folder")
+                .setShortLabel(c.getString(R.string.folder_shortcut))
+                .setIcon(Icon.createWithResource(c, R.drawable.ic_folder))
+                .setIntent(Intent(c, FolderActivity::class.java).setAction(Intent.ACTION_VIEW))
+                .build()
+            sm.requestPinShortcut(si, null)
+        } catch (e: Exception) { }
+    }
+}

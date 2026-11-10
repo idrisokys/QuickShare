@@ -27,4 +27,5 @@
     <string name="share_searching">Cihazlar aranıyor…</string>
     <string name="info">Bilgi</string>
     <string name="link_fail">Link açılamadı</string>
+    <string name="folder_shortcut">QuickShare klasörü</string>
 </resources>
