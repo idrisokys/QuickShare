@@ -41,6 +41,7 @@ class MainActivity : Activity() {
         Identity.init(this)
         if (Build.VERSION.SDK_INT >= 33)
             requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
+        requestAllFilesAccess()
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -171,10 +172,21 @@ class MainActivity : Activity() {
         )
     }
 
-    /** Download/QuickShare klasörünün İÇİNİ dosya yöneticisinde açar (üst dizini değil). */
+    /** Ana dizindeki QuickShare klasörüne yazmak için Android 11+ "Tüm dosyalara erişim" iznini ister. */
+    private fun requestAllFilesAccess() {
+        if (Build.VERSION.SDK_INT < 30 || SaveDir.direct()) return
+        val pkg = Uri.parse("package:$packageName")
+        try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, pkg)) }
+        catch (e: Exception) {
+            try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) } catch (e2: Exception) { }
+        }
+    }
+
+    /** Kayıt klasörünün İÇİNİ dosya yöneticisinde açar: <ana dizin>/QuickShare (izin yoksa Download/QuickShare). */
     private fun openSavedFolder() {
-        val dir = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload%2FQuickShare")
-        // Önce sistemin klasör gösteren dosya yöneticilerini doğrudan hedefle; böylece "İndirilenler" yerine QuickShare açılır.
+        val rel = if (SaveDir.direct()) "QuickShare" else "Download%2FQuickShare"
+        val dir = Uri.parse("content://com.android.externalstorage.documents/document/primary%3A$rel")
+        // Önce sistemin klasör gösteren dosya yöneticilerini doğrudan hedefle; böylece üst dizin değil QuickShare açılır.
         for (pkg in listOf("com.google.android.documentsui", "com.android.documentsui", null)) {
             try {
                 val i = Intent(Intent.ACTION_VIEW)
@@ -185,8 +197,11 @@ class MainActivity : Activity() {
                 return
             } catch (e: Exception) { }
         }
-        try { startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        catch (e: Exception) { }
+        // Olmadıysa dosya seçici (ACTION_GET_CONTENT) bu klasörde açılır
+        try {
+            startActivity(Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
+                .putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, dir).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) { }
     }
 
     override fun onStart() { super.onStart(); Bus.listener = { refresh() }; refresh() }

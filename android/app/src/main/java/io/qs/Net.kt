@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -11,6 +12,9 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
 import java.io.BufferedReader
+import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.URLDecoder
@@ -21,6 +25,23 @@ import kotlin.concurrent.thread
 
 private const val TYPE = "_qshare._tcp."
 private const val BUF = 1 shl 20
+
+/** Alınan dosyaların varsayılan konumu: <ana dizin>/QuickShare */
+object SaveDir {
+    fun dir() = File(android.os.Environment.getExternalStorageDirectory(), "QuickShare")
+    /** Android 11+ ve "Tüm dosyalara erişim" verilmişse doğrudan ana dizine yazılabilir. */
+    fun direct() = android.os.Build.VERSION.SDK_INT >= 30 && android.os.Environment.isExternalStorageManager()
+    /** Aynı ad varsa "ad (1).uzantı" biçiminde yeni ad üretir. */
+    fun unique(d: File, name: String): File {
+        var f = File(d, name)
+        if (!f.exists()) return f
+        val base = name.substringBeforeLast('.', name)
+        val ext = if (name.contains('.')) "." + name.substringAfterLast('.') else ""
+        var i = 1
+        while (f.exists()) { f = File(d, "$base ($i)$ext"); i++ }
+        return f
+    }
+}
 
 /** mDNS (NsdManager): kendini duyurur ve çevredeki cihazları bulur. */
 class Discovery(c: Context) {
@@ -141,16 +162,28 @@ class Receiver(private val ctx: Context) {
                 val clean = name.substringAfterLast('/').substringAfterLast('\\')
                     .replace(Regex("[\\u0000-\\u001f:*?\"<>|]"), "_").trimStart('.').take(120).ifBlank { "file" }
 
+                // Varsayılan: <ana dizin>/QuickShare (Tüm dosyalara erişim izni varsa).
+                // İzin yoksa Download/QuickShare'e (MediaStore) kaydedilir.
                 val cr = ctx.contentResolver
-                val cv = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, clean)
-                    put(MediaStore.Downloads.RELATIVE_PATH, "Download/QuickShare")
-                    put(MediaStore.Downloads.IS_PENDING, 1)
+                val direct = SaveDir.direct()
+                var file: File? = null
+                var uri: Uri? = null
+                val cv = ContentValues()
+                val os: OutputStream
+                if (direct) {
+                    val d = SaveDir.dir().also { it.mkdirs() }
+                    file = SaveDir.unique(d, clean)
+                    os = FileOutputStream(file)
+                } else {
+                    cv.put(MediaStore.Downloads.DISPLAY_NAME, clean)
+                    cv.put(MediaStore.Downloads.RELATIVE_PATH, "Download/QuickShare")
+                    cv.put(MediaStore.Downloads.IS_PENDING, 1)
+                    uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)!!
+                    os = cr.openOutputStream(uri)!!
                 }
-                val uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)!!
                 var ok = false
                 try {
-                    cr.openOutputStream(uri)!!.use { out ->
+                    os.use { out ->
                         val b = ByteArray(BUF)
                         var left = len
                         var last = -1
@@ -165,10 +198,13 @@ class Receiver(private val ctx: Context) {
                         ok = left == 0L
                     }
                 } finally {
-                    if (ok) {
+                    if (direct) {
+                        if (ok) MediaScannerConnection.scanFile(ctx, arrayOf(file!!.absolutePath), null, null)
+                        else file!!.delete()
+                    } else if (ok) {
                         cv.clear(); cv.put(MediaStore.Downloads.IS_PENDING, 0)
-                        cr.update(uri, cv, null, null)
-                    } else cr.delete(uri, null, null)
+                        cr.update(uri!!, cv, null, null)
+                    } else cr.delete(uri!!, null, null)
                 }
                 reply(s, if (ok) "200 OK" else "500 Error")
                 Bus.set(if (ok) ctx.getString(R.string.saved, clean) else ctx.getString(R.string.recv_partial), -1, ok)

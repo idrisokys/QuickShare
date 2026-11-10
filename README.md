@@ -30,7 +30,7 @@ The apps use the device language: **Turkish** on Turkish devices, **English** ev
 
 **Mac keyboard shortcut:** select files or folders in Finder, then use Finder > Services > **Send with QuickShare**. To give it a shortcut, open System Settings > Keyboard > Keyboard Shortcuts > Services > Files and Folders and set one for it. If only one device is online the files go to it directly. Folders are sent as a `.zip`.
 
-Received files are saved to `Download/QuickShare` (Android) or `~/Downloads/QuickShare` (Mac).
+Received files are saved to `QuickShare` in the internal storage root (Android; needs "All files access", otherwise `Download/QuickShare`) or `~/Downloads/QuickShare` (Mac).
 
 ## Build
 
