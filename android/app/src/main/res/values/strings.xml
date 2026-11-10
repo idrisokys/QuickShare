@@ -6,10 +6,7 @@
     <string name="ready">%1$s  ·  ready</string>
     <string name="select_file">Select files</string>
     <string name="searching">Searching for nearby devices…</string>
-    <string name="hint">Tap to add, long-press to remove</string>
-    <string name="offline">(offline)</string>
-    <string name="added">Trusted device added</string>
-    <string name="removed">Removed from list</string>
+    <string name="hint">Tap a device to send files</string>
     <string name="device_default">Device</string>
     <string name="receiving">Receiving: %1$s</string>
     <string name="saved">Saved: %1$s</string>
@@ -19,13 +16,15 @@
     <string name="sent">Sent</string>
     <string name="error_fmt">Error: %1$s</string>
     <string name="err_connection">connection error</string>
-    <string name="no_trusted">No trusted device found</string>
+    <string name="no_device">No device found</string>
     <string name="pick_device">Which device?</string>
     <string name="send">Send</string>
     <string name="cancel">Cancel</string>
     <string name="err_open">Could not open file</string>
     <string name="err_size">File size is unknown</string>
     <string name="err_verify">Could not verify the device</string>
-    <string name="err_rejected">The other device refused (I am not in its trusted list)</string>
+    <string name="err_rejected">The other device refused the transfer</string>
     <string name="share_searching">Searching for devices…</string>
+    <string name="info">Info</string>
+    <string name="link_fail">Could not open link</string>
 </resources>

@@ -13,9 +13,8 @@ The apps use the device language: **Turkish** on Turkish devices, **English** ev
 ## Features
 
 - Works without Google Play Services
-- Trusted device list: tap a nearby device once to trust it
-- Files from trusted devices are accepted automatically
-- Sends straight to the device if only one trusted device is online
+- Every nearby device in the list can receive files directly: tap a device, pick files, done
+- Files from devices on your network are accepted automatically
 - Appears in the system Share menu
 - Encrypted with TLS, devices are verified by certificate fingerprint
 
@@ -27,8 +26,7 @@ The apps use the device language: **Turkish** on Turkish devices, **English** ev
 ## How to use
 
 1. Install and open the app on both devices (same network).
-2. On each device, tap the other one in the list to trust it. Trust works one way, so do it on both.
-3. Pick files with **Select files**, drag and drop (Mac), or use the Share menu.
+2. Tap a device in the list and pick files, or use **Select files**, drag and drop (Mac), or the Share menu.
 
 Received files are saved to `Download/QuickShare` (Android) or `~/Downloads/QuickShare` (Mac).
 
@@ -58,8 +56,8 @@ GitHub Actions builds both apps on every push. Push a tag like `v1.0` to attach 
 
 - Discovery: mDNS service `_qshare._tcp` with TXT records `n` (name) and `f` (certificate SHA-256 fingerprint)
 - Transfer: mutual TLS, one `POST /u` request per file (name in the `X-Name` header)
-- Trust: a sender is accepted only if its certificate fingerprint is in the trusted list
+- The sender checks the receiver's certificate fingerprint against the one announced over mDNS
 
 ## Security note
 
-Files from trusted devices are saved without asking. Only trust devices you know and avoid using the app on public networks.
+Any device on the same network can send you files, and they are saved without asking. Avoid using the app on public networks.

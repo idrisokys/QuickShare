@@ -24,6 +24,7 @@ private const val BUF = 1 shl 20
 
 /** mDNS (NsdManager): kendini duyurur ve çevredeki cihazları bulur. */
 class Discovery(c: Context) {
+    private val app = c.applicationContext
     private val nsd = c.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var rl: NsdManager.RegistrationListener? = null
     private var dl: NsdManager.DiscoveryListener? = null
@@ -55,7 +56,7 @@ class Discovery(c: Context) {
             override fun onDiscoveryStarted(t: String?) {}
             override fun onDiscoveryStopped(t: String?) {}
             override fun onServiceFound(s: NsdServiceInfo) { if (s.serviceName != myName) enqueue(s) }
-            override fun onServiceLost(s: NsdServiceInfo) { Peers.del(s.serviceName) }
+            override fun onServiceLost(s: NsdServiceInfo) { Peers.del(s.serviceName); Shortcuts.update(app) }
         }
         nsd.discoverServices(TYPE, NsdManager.PROTOCOL_DNS_SD, dl)
     }
@@ -77,7 +78,7 @@ class Discovery(c: Context) {
                 val f = i.attributes["f"]?.toString(Charsets.UTF_8)
                 val n = i.attributes["n"]?.toString(Charsets.UTF_8)
                 if (f != null && f != Identity.fp && i.host != null)
-                    Peers.put(i.serviceName, Peer(f, n ?: "?", i.host, i.port))
+                    { Peers.put(i.serviceName, Peer(f, n ?: "?", i.host, i.port)); Shortcuts.update(app) }
                 done()
             }
         })
@@ -86,14 +87,13 @@ class Discovery(c: Context) {
     @Synchronized private fun done() { busy = false; pump() }
 }
 
-/** TLS sunucu: sadece güvenilir parmak izli cihazlardan dosya kabul eder. */
+/** TLS sunucu: ağdaki cihazlardan gelen dosyaları kabul eder. */
 class Receiver(private val ctx: Context) {
     private var ss: SSLServerSocket? = null
     val port get() = ss!!.localPort
 
     fun start() {
         val s = (Identity.ssl.serverSocketFactory.createServerSocket(0) as SSLServerSocket)
-        s.wantClientAuth = true
         ss = s
         thread(isDaemon = true) {
             while (true) {
@@ -125,8 +125,6 @@ class Receiver(private val ctx: Context) {
             try {
                 s.soTimeout = 30000
                 s.startHandshake()
-                val fp = try { Identity.fpOf(s.session.peerCertificates[0]) } catch (e: Exception) { null }
-                if (fp == null || !Trust.has(fp)) { reply(s, "403 Forbidden"); return }
                 val ins = s.inputStream
                 line(ins)
                 var len = -1L
@@ -182,19 +180,19 @@ class Receiver(private val ctx: Context) {
 }
 
 object Sender {
-    /** Güvenilir cihaz yoksa uyarır, tek ise direkt gönderir, çoksa seçtirir. */
+    /** Cihaz yoksa uyarır, tek ise direkt gönderir, çoksa seçtirir. only verilirse sadece o cihaza gönderir. */
     fun start(a: Activity, uris: List<Uri>, only: String?, fin: () -> Unit) {
-        val ps = Peers.list().filter { Trust.has(it.fp) && (only == null || it.fp == only) }
+        val ps = Peers.list().filter { only == null || it.fp == only }
         fun go(p: Peer) = send(a.applicationContext, p, uris) { m ->
             a.runOnUiThread { Toast.makeText(a, m, Toast.LENGTH_LONG).show(); fin() }
         }
         when {
             ps.isEmpty() -> {
-                Toast.makeText(a, a.getString(R.string.no_trusted), Toast.LENGTH_LONG).show(); fin()
+                Toast.makeText(a, a.getString(R.string.no_device), Toast.LENGTH_LONG).show(); fin()
             }
             ps.size == 1 -> go(ps[0])
             else -> {
-                var sel = ps.indexOfFirst { it.fp == Trust.last }.coerceAtLeast(0)
+                var sel = ps.indexOfFirst { it.fp == Last.fp }.coerceAtLeast(0)
                 AlertDialog.Builder(a).setTitle(R.string.pick_device)
                     .setSingleChoiceItems(ps.map { it.name }.toTypedArray(), sel) { _, w -> sel = w }
                     .setPositiveButton(R.string.send) { _, _ -> go(ps[sel]) }
@@ -214,7 +212,7 @@ object Sender {
             ok = false
             msg = c.getString(R.string.error_fmt, e.message ?: c.getString(R.string.err_connection))
         }
-        if (ok) Trust.last = p.fp
+        if (ok) Last.fp = p.fp
         Bus.set(msg)
         done(msg)
     }

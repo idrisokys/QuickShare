@@ -98,47 +98,22 @@ struct Peer: Identifiable {
 struct Row: Identifiable {
     let fp: String
     let name: String
-    let trusted: Bool
-    let online: Bool
     var id: String { fp }
 }
 
-/// Uygulama durumu: bulunan cihazlar, güvenilir liste, ilerleme.
+/// Uygulama durumu: bulunan cihazlar, ilerleme.
 final class Store: ObservableObject {
     static let shared = Store()
 
     @Published var peers: [String: Peer] = [:]
-    @Published var trusted: [String: String]
     @Published var status = ""
     @Published var pct = -1.0
     /// Son kaydedilen dosya; durum yazısına tıklanınca klasörü açmak için.
     @Published var savedURL: URL?
 
-    private let lock = NSLock()
-    private var fps = Set<String>()
-
-    init() {
-        trusted = UserDefaults.standard.dictionary(forKey: "trusted") as? [String: String] ?? [:]
-        fps = Set(trusted.keys)
-    }
-
     var last: String? {
         get { UserDefaults.standard.string(forKey: "last") }
         set { UserDefaults.standard.set(newValue, forKey: "last") }
-    }
-
-    /// Her thread'den çağrılabilir (TLS doğrulaması).
-    func isTrusted(_ fp: String) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return fps.contains(fp)
-    }
-
-    func trust(_ fp: String, _ name: String) { trusted[fp] = name; persist() }
-    func untrust(_ fp: String) { trusted.removeValue(forKey: fp); persist() }
-
-    private func persist() {
-        UserDefaults.standard.set(trusted, forKey: "trusted")
-        lock.lock(); fps = Set(trusted.keys); lock.unlock()
     }
 
     func post(_ s: String, _ p: Double = -1, saved: URL? = nil) {
@@ -146,10 +121,6 @@ final class Store: ObservableObject {
     }
 
     var rows: [Row] {
-        let on = peers.values.sorted { $0.name < $1.name }
-            .map { Row(fp: $0.fp, name: $0.name, trusted: trusted[$0.fp] != nil, online: true) }
-        let off = trusted.filter { peers[$0.key] == nil }.sorted { $0.value < $1.value }
-            .map { Row(fp: $0.key, name: $0.value, trusted: true, online: false) }
-        return on + off
+        peers.values.sorted { $0.name < $1.name }.map { Row(fp: $0.fp, name: $0.name) }
     }
 }

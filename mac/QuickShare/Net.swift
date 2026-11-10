@@ -2,7 +2,7 @@ import Foundation
 import Network
 import Security
 
-/// mDNS + TLS: Android sürümüyle aynı protokol (_qshare._tcp, POST /u, parmak izi ile güven).
+/// mDNS + TLS: Android sürümüyle aynı protokol (_qshare._tcp, POST /u, gönderilen cihazın parmak izi doğrulanır).
 final class Net {
     static let shared = Net()
     let q = DispatchQueue(label: "qs.net")
@@ -28,8 +28,8 @@ final class Net {
     }
 
     func start() throws {
-        // Sadece güvenilir cihazlar TLS el sıkışmasını geçebilir.
-        let l = try NWListener(using: params { Store.shared.isTrusted($0) })
+        // Ağdaki her cihazdan gelen bağlantı kabul edilir.
+        let l = try NWListener(using: params { _ in true })
         l.service = NWListener.Service(
             name: "QS" + String(Identity.fp.prefix(10)),
             type: "_qshare._tcp",
@@ -236,8 +236,7 @@ enum Sender {
         }
         if rs.wait(timeout: .now() + 30) == .timedOut { throw QSError(L("err_no_reply")) }
         guard resp.contains(" 200") else {
-            throw QSError(resp.contains("403")
-                ? L("err_rejected") : L("err_remote"))
+            throw QSError(L("err_remote"))
         }
     }
 }

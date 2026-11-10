@@ -9,9 +9,8 @@ Uygulamalar cihaz diline uyar: Türkçe cihazlarda **Türkçe**, diğer tüm cih
 ## Özellikler
 
 - Google Play Hizmetleri gerekmez
-- Güvenilir cihaz listesi: yakındaki cihaza bir kez dokunarak ekleyin
-- Güvenilir cihazlardan gelen dosyalar otomatik kabul edilir
-- Tek güvenilir cihaz çevrimiçiyse dosya doğrudan ona gider
+- Listedeki her yakın cihaza doğrudan gönderilir: cihaza dokunun, dosyaları seçin, bitti
+- Ağınızdaki cihazlardan gelen dosyalar otomatik kabul edilir
 - Sistemin paylaş menüsünde görünür
 - TLS ile şifreli, cihazlar sertifika parmak iziyle doğrulanır
 
@@ -23,8 +22,7 @@ Uygulamalar cihaz diline uyar: Türkçe cihazlarda **Türkçe**, diğer tüm cih
 ## Kullanım
 
 1. Uygulamayı iki cihaza kurup açın (aynı ağda olun).
-2. Her cihazda listedeki diğer cihaza dokunarak güvenilir yapın. Güven tek yönlüdür, ikisinde de yapın.
-3. **Dosya seç**, sürükle-bırak (Mac) veya paylaş menüsü ile gönderin.
+2. Listedeki bir cihaza dokunup dosyaları seçin; ya da **Dosya seç**, sürükle-bırak (Mac) veya paylaş menüsünü kullanın.
 
 Alınan dosyalar Android'de `Download/QuickShare`, Mac'te `~/Downloads/QuickShare` klasörüne kaydedilir.
 
@@ -54,8 +52,8 @@ GitHub Actions her push'ta iki uygulamayı da derler. `v1.0` gibi bir etiket gö
 
 - Keşif: `_qshare._tcp` mDNS servisi, TXT kayıtları `n` (ad) ve `f` (sertifika SHA-256 parmak izi)
 - Aktarım: karşılıklı TLS, dosya başına tek `POST /u` isteği (ad `X-Name` başlığında)
-- Güven: gönderenin sertifika parmak izi güvenilir listedeyse kabul edilir
+- Gönderen, alıcının sertifika parmak izini mDNS ile duyurulan izle karşılaştırır
 
 ## Güvenlik notu
 
-Güvenilir cihazlardan gelen dosyalar sorulmadan kaydedilir. Sadece tanıdığınız cihazlara güvenin ve halka açık ağlarda kullanmayın.
+Aynı ağdaki her cihaz size dosya gönderebilir ve dosyalar sorulmadan kaydedilir. Halka açık ağlarda kullanmayın.

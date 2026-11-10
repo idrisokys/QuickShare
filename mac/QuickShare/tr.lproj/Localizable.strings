@@ -1,17 +1,16 @@
 "app_name" = "Hızlı Paylaş";
 "nearby" = "Yakındaki cihazlar";
-"offline" = "çevrimdışı";
 "searching" = "Yakındaki cihazlar aranıyor…";
-"hint" = "Eklemek için tıkla, silmek için sağ tıkla";
+"hint" = "Dosya göndermek için bir cihaza tıkla";
 "select_file" = "Dosya seç";
 "launch_login" = "Açılışta başlat";
 "quit" = "Çık";
-"remove" = "Listeden çıkar";
+"info" = "Bilgi";
 "send" = "Gönder";
 "cancel" = "İptal";
 "which_device" = "Hangi cihaza?";
 "confirm_send" = "%d dosya gönderilsin mi?";
-"no_trusted" = "Güvenilir cihaz bulunamadı";
+"no_device" = "Cihaz bulunamadı";
 "receiving" = "Alınıyor: %@";
 "saved" = "Kaydedildi: %@";
 "recv_partial" = "Alma yarım kaldı";
@@ -26,5 +25,4 @@
 "err_nocon" = "bağlantı kurulamadı";
 "err_connect" = "Bağlanılamadı veya cihaz doğrulanamadı (%@)";
 "err_no_reply" = "Yanıt gelmedi";
-"err_rejected" = "Karşı cihaz kabul etmedi (güvenilir listesinde değilim)";
 "err_remote" = "Karşı cihaz hata verdi";

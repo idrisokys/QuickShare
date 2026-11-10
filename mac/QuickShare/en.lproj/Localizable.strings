@@ -1,17 +1,16 @@
 "app_name" = "QuickShare";
 "nearby" = "Nearby devices";
-"offline" = "offline";
 "searching" = "Searching for nearby devices…";
-"hint" = "Click to add, right-click to remove";
+"hint" = "Click a device to send files";
 "select_file" = "Select files";
 "launch_login" = "Launch at login";
 "quit" = "Quit";
-"remove" = "Remove from list";
+"info" = "Info";
 "send" = "Send";
 "cancel" = "Cancel";
 "which_device" = "Which device?";
 "confirm_send" = "Send %d file(s)?";
-"no_trusted" = "No trusted device found";
+"no_device" = "No device found";
 "receiving" = "Receiving: %@";
 "saved" = "Saved: %@";
 "recv_partial" = "Transfer incomplete";
@@ -26,5 +25,4 @@
 "err_nocon" = "could not connect";
 "err_connect" = "Could not connect or verify the device (%@)";
 "err_no_reply" = "No response";
-"err_rejected" = "The other device refused (I am not in its trusted list)";
 "err_remote" = "The other device reported an error";

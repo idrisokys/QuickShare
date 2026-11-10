@@ -45,16 +45,16 @@ func isFile(_ u: URL) -> Bool {
 }
 
 extension Store {
-    /// Güvenilir cihaz tek ise doğrudan gönderir, birden fazlaysa sordurur.
+    /// Cihaz tek ise doğrudan gönderir, birden fazlaysa sordurur. only verilirse sadece o cihaza gider.
     /// confirm: dış kaynaktan (paylaş menüsü) gelen isteklerde her zaman onay ister.
-    func dispatch(_ files: [URL], confirm: Bool, tries: Int = 7) {
-        let ps = peers.values.filter { trusted[$0.fp] != nil }.sorted { $0.name < $1.name }
+    func dispatch(_ files: [URL], confirm: Bool, only: String? = nil, tries: Int = 7) {
+        let ps = peers.values.filter { only == nil || $0.fp == only }.sorted { $0.name < $1.name }
         if ps.isEmpty {
             if tries < 10 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.dispatch(files, confirm: confirm, tries: tries + 1)
+                    self.dispatch(files, confirm: confirm, only: only, tries: tries + 1)
                 }
-            } else { post(L("no_trusted")) }
+            } else { post(L("no_device")) }
             return
         }
         var target: Peer? = ps[0]
@@ -78,13 +78,13 @@ extension Store {
         return a.runModal() == .alertFirstButtonReturn ? ps[pop.indexOfSelectedItem] : nil
     }
 
-    func pickFiles() {
+    func pickFiles(to fp: String? = nil) {
         let p = NSOpenPanel()
         p.allowsMultipleSelection = true
         p.canChooseDirectories = false
         NSApp.activate(ignoringOtherApps: true)
         p.begin { r in
-            if r == .OK { DispatchQueue.main.async { Store.shared.dispatch(p.urls, confirm: false) } }
+            if r == .OK { DispatchQueue.main.async { Store.shared.dispatch(p.urls, confirm: false, only: fp) } }
         }
     }
 }
@@ -99,6 +99,7 @@ struct ContentView: View {
                 Text(Identity.name).font(.headline).lineLimit(1)
                 Spacer()
                 Circle().fill(Color.green).frame(width: 8, height: 8)
+                InfoButton()
             }
             Text(L("nearby")).font(.caption).foregroundColor(.secondary)
 
@@ -106,19 +107,14 @@ struct ContentView: View {
                 VStack(spacing: 6) {
                     ForEach(s.rows) { r in
                         HStack {
-                            Image(systemName: r.trusted ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(r.trusted ? .accentColor : .secondary)
-                            Text(r.name).foregroundColor(r.online ? .primary : .secondary).lineLimit(1)
-                            if !r.online { Text(L("offline")).font(.caption).foregroundColor(.secondary) }
+                            Image(systemName: "paperplane").foregroundColor(.accentColor)
+                            Text(r.name).lineLimit(1)
                             Spacer()
                         }
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
                         .contentShape(Rectangle())
-                        .onTapGesture { if !r.trusted && r.online { s.trust(r.fp, r.name) } }
-                        .contextMenu {
-                            if r.trusted { Button(L("remove")) { s.untrust(r.fp) } }
-                        }
+                        .onTapGesture { s.pickFiles(to: r.fp) }
                     }
                     if s.rows.isEmpty {
                         Text(L("searching")).font(.callout).foregroundColor(.secondary).padding(.top, 20)
@@ -131,8 +127,8 @@ struct ContentView: View {
                 .font(.caption).foregroundColor(s.savedURL != nil ? .accentColor : .secondary).lineLimit(2)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    // "Kaydedildi" yazısına tıklayınca klasörü aç, dosyayı seçili göster.
-                    if let u = s.savedURL { NSWorkspace.shared.activateFileViewerSelecting([u]) }
+                    // "Kaydedildi" yazısına tıklayınca QuickShare klasörünün içini aç.
+                    if let u = s.savedURL { NSWorkspace.shared.open(u.deletingLastPathComponent()) }
                 }
                 .onHover { inside in
                     if s.savedURL != nil { if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
@@ -177,5 +173,28 @@ struct ContentView: View {
             g.notify(queue: .main) { if !urls.isEmpty { s.dispatch(urls, confirm: false) } }
             return true
         }
+    }
+}
+
+/// Sağ üstteki bilgi (i) ikonu: küçük açılır kutu (resim, e-posta, GitHub linki).
+struct InfoButton: View {
+    @State private var shown = false
+
+    var body: some View {
+        Button { shown.toggle() } label: { Image(systemName: "info.circle") }
+            .buttonStyle(.plain)
+            .help(L("info"))
+            .popover(isPresented: $shown, arrowEdge: .bottom) {
+                VStack(spacing: 4) {
+                    if let img = NSImage(named: "releases_icon") {
+                        Image(nsImage: img).resizable().scaledToFill()
+                            .frame(width: 36, height: 36).clipShape(Circle())
+                    }
+                    Text("sislivadi@gmail.com").textSelection(.enabled)
+                    Link("https://github.com/idrisokys/", destination: URL(string: "https://github.com/idrisokys/")!)
+                }
+                .font(.system(size: 11))
+                .padding(8)
+            }
     }
 }

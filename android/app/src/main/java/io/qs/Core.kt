@@ -47,18 +47,13 @@ object Peers {
     @Synchronized fun list(): List<Peer> = m.values.distinctBy { it.fp }
 }
 
-/** Güvenilir cihazlar: sertifika parmak izi -> ad. */
-object Trust {
+/** Son gönderim yapılan cihazın parmak izi (seçim penceresinde ön seçim için). */
+object Last {
     private lateinit var sp: SharedPreferences
-    fun init(c: Context) { sp = c.getSharedPreferences("trust", 0) }
-    fun all(): Map<String, String> =
-        sp.all.filter { it.key != "_last" }.mapValues { it.value.toString() }
-    fun has(fp: String) = sp.contains(fp)
-    fun add(fp: String, name: String) = sp.edit().putString(fp, name).apply()
-    fun del(fp: String) = sp.edit().remove(fp).apply()
-    var last: String?
-        get() = sp.getString("_last", null)
-        set(v) = sp.edit().putString("_last", v).apply()
+    fun init(c: Context) { sp = c.getSharedPreferences("last", 0) }
+    var fp: String?
+        get() = sp.getString("fp", null)
+        set(v) = sp.edit().putString("fp", v).apply()
 }
 
 @SuppressLint("CustomX509TrustManager", "TrustAllX509TrustManager")
@@ -78,7 +73,7 @@ object Identity {
     @Synchronized
     fun init(c: Context) {
         if (ok) return
-        Trust.init(c.applicationContext)
+        Last.init(c.applicationContext)
         name = Settings.Global.getString(c.contentResolver, "device_name") ?: Build.MODEL
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         if (!ks.containsAlias("qs")) {
@@ -106,14 +101,14 @@ object Identity {
         MessageDigest.getInstance("SHA-256").digest(c.encoded).joinToString("") { "%02x".format(it) }
 }
 
-/** Güvenilir cihazları paylaş menüsünde doğrudan hedef olarak gösterir. */
+/** Ağdaki cihazları paylaş menüsünde doğrudan hedef olarak gösterir. */
 object Shortcuts {
     fun update(c: Context) {
         try {
             val sm = c.getSystemService(ShortcutManager::class.java)
-            sm.dynamicShortcuts = Trust.all().entries.take(4).map {
-                ShortcutInfo.Builder(c, it.key)
-                    .setShortLabel(it.value.ifBlank { c.getString(R.string.device_default) }.take(25))
+            sm.dynamicShortcuts = Peers.list().take(4).map {
+                ShortcutInfo.Builder(c, it.fp)
+                    .setShortLabel(it.name.ifBlank { c.getString(R.string.device_default) }.take(25))
                     .setIcon(Icon.createWithResource(c, R.drawable.ic))
                     .setCategories(setOf("io.qs.TARGET"))
                     .setLongLived(true)
