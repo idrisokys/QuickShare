@@ -163,8 +163,10 @@ class MainActivity : Activity() {
     }
 
     private fun pickFiles() {
+        // ACTION_GET_CONTENT lets Android route file selection to an installed
+        // file manager/content provider instead of forcing the SAF DocumentsUI.
         startActivityForResult(
-            Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("*/*").putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true), 1
         )
     }
