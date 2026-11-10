@@ -121,7 +121,6 @@ class MainActivity : Activity() {
 
         st = TextView(this).apply {
             textSize = 16f; setTextColor(0xFFBBBBBB.toInt()); setPadding(0, dp(8), 0, dp(8))
-            setOnClickListener { if (Bus.saved) openSavedFolder() }
         }
         root.addView(st)
         bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
@@ -180,28 +179,6 @@ class MainActivity : Activity() {
         catch (e: Exception) {
             try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) } catch (e2: Exception) { }
         }
-    }
-
-    /** Kayıt klasörünün İÇİNİ dosya yöneticisinde açar: <ana dizin>/QuickShare (izin yoksa Download/QuickShare). */
-    private fun openSavedFolder() {
-        val rel = if (SaveDir.direct()) "QuickShare" else "Download%2FQuickShare"
-        val dir = Uri.parse("content://com.android.externalstorage.documents/document/primary%3A$rel")
-        // Önce sistemin klasör gösteren dosya yöneticilerini doğrudan hedefle; böylece üst dizin değil QuickShare açılır.
-        for (pkg in listOf("com.google.android.documentsui", "com.android.documentsui", null)) {
-            try {
-                val i = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(dir, "vnd.android.document/directory")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                if (pkg != null) i.setPackage(pkg)
-                startActivity(i)
-                return
-            } catch (e: Exception) { }
-        }
-        // Olmadıysa dosya seçici (ACTION_GET_CONTENT) bu klasörde açılır
-        try {
-            startActivity(Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
-                .putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, dir).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        } catch (e: Exception) { }
     }
 
     override fun onStart() { super.onStart(); Bus.listener = { refresh() }; refresh() }
