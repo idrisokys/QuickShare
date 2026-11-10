@@ -3,14 +3,4 @@
         <data android:mimeType="*/*" />
         <category android:name="io.qs.TARGET" />
     </share-target>
-    <shortcut
-        android:shortcutId="folder_static"
-        android:enabled="true"
-        android:icon="@drawable/ic_folder"
-        android:shortcutShortLabel="@string/folder_shortcut">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetPackage="io.qs.share"
-            android:targetClass="io.qs.FolderActivity" />
-    </shortcut>
 </shortcuts>

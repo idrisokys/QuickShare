@@ -45,12 +45,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".FolderActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:theme="@android:style/Theme.NoDisplay" />
-
         <service
             android:name=".ReceiverService"
             android:exported="false"

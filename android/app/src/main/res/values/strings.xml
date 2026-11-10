@@ -27,5 +27,4 @@
     <string name="share_searching">Searching for devices…</string>
     <string name="info">Info</string>
     <string name="link_fail">Could not open link</string>
-    <string name="folder_shortcut">QuickShare folder</string>
 </resources>
