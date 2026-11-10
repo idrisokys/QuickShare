@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        NSApp.servicesProvider = self
+        NSUpdateDynamicServices()
         do { try Identity.setup(); try Net.shared.start() }
         catch { Store.shared.post(L("start_failed", error.localizedDescription)) }
     }
@@ -34,14 +36,71 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let u = URL(string: s), u.scheme == "quickshare",
               let items = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems else { return }
         let files = items.filter { $0.name == "p" }.compactMap { $0.value }
-            .map { URL(fileURLWithPath: $0) }.filter(isFile)
-        if !files.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(files, confirm: true, tries: 0) } }
+            .map { URL(fileURLWithPath: $0) }.filter(isItem)
+        if !files.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(files, confirm: false, tries: 0) } }
+    }
+
+    /// Servisler menüsü → "QuickShare ile Gönder" (Info.plist'teki NSServices, NSMessage = sendFiles).
+    /// Finder'da dosya/klasör seçip Sistem Ayarları → Klavye → Klavye Kısayolları → Servisler'den
+    /// bu girişe atanan kısayolla çalışır. Açık tek cihaz varsa sormadan ona gönderir.
+    @objc func sendFiles(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
+        let urls = (pboard.readObjects(forClasses: [NSURL.self],
+                                       options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        let items = urls.filter(isItem)
+        if !items.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(items, confirm: false, tries: 0) } }
     }
 }
 
-func isFile(_ u: URL) -> Bool {
+/// Dosya ya da klasör var mı?
+func isItem(_ u: URL) -> Bool { FileManager.default.fileExists(atPath: u.path) }
+
+func isDir(_ u: URL) -> Bool {
     var d: ObjCBool = false
-    return FileManager.default.fileExists(atPath: u.path, isDirectory: &d) && !d.boolValue
+    return FileManager.default.fileExists(atPath: u.path, isDirectory: &d) && d.boolValue
+}
+
+/// Ekranın altında kısa süre görünen küçük bildirim (kısayolla gönderirken pencere açık olmadığı için).
+enum HUD {
+    private static var panel: NSPanel?
+
+    static func show(_ text: String) {
+        DispatchQueue.main.async {
+            panel?.close()
+            let label = NSTextField(labelWithString: text)
+            label.font = .systemFont(ofSize: 14, weight: .medium)
+            label.textColor = .white
+            label.lineBreakMode = .byTruncatingMiddle
+            label.sizeToFit()
+            let pad: CGFloat = 16
+            let w = min(label.frame.width, 420)
+            let size = NSSize(width: w + pad * 2, height: label.frame.height + pad)
+            label.frame = NSRect(x: pad, y: pad / 2, width: w, height: label.frame.height)
+
+            let p = NSPanel(contentRect: NSRect(origin: .zero, size: size),
+                            styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+            p.isOpaque = false
+            p.backgroundColor = .clear
+            p.level = .statusBar
+            p.hasShadow = true
+            p.ignoresMouseEvents = true
+            p.isReleasedWhenClosed = false
+            let bg = NSView(frame: NSRect(origin: .zero, size: size))
+            bg.wantsLayer = true
+            bg.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.82).cgColor
+            bg.layer?.cornerRadius = 10
+            bg.addSubview(label)
+            p.contentView = bg
+            if let scr = NSScreen.main {
+                p.setFrameOrigin(NSPoint(x: scr.visibleFrame.midX - size.width / 2, y: scr.visibleFrame.minY + 80))
+            }
+            p.orderFrontRegardless()
+            panel = p
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                if panel === p { p.close(); panel = nil }
+            }
+        }
+    }
 }
 
 extension Store {
@@ -54,7 +113,7 @@ extension Store {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     self.dispatch(files, confirm: confirm, only: only, tries: tries + 1)
                 }
-            } else { post(L("no_device")) }
+            } else { post(L("no_device")); HUD.show(L("no_device")) }
             return
         }
         var target: Peer? = ps[0]
@@ -81,7 +140,7 @@ extension Store {
     func pickFiles(to fp: String? = nil) {
         let p = NSOpenPanel()
         p.allowsMultipleSelection = true
-        p.canChooseDirectories = false
+        p.canChooseDirectories = true
         NSApp.activate(ignoringOtherApps: true)
         p.begin { r in
             if r == .OK { DispatchQueue.main.async { Store.shared.dispatch(p.urls, confirm: false, only: fp) } }
@@ -170,7 +229,7 @@ struct ContentView: View {
                     var u: URL?
                     if let x = item as? URL { u = x }
                     else if let d = item as? Data { u = URL(dataRepresentation: d, relativeTo: nil) }
-                    if let u, isFile(u) { lock.lock(); urls.append(u); lock.unlock() }
+                    if let u, isItem(u) { lock.lock(); urls.append(u); lock.unlock() }
                     g.leave()
                 }
             }

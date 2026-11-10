@@ -24,6 +24,8 @@ Uygulamalar cihaz diline uyar: Türkçe cihazlarda **Türkçe**, diğer tüm cih
 1. Uygulamayı iki cihaza kurup açın (aynı ağda olun).
 2. Listedeki bir cihaza dokunup dosyaları seçin; ya da **Dosya seç**, sürükle-bırak (Mac) veya paylaş menüsünü kullanın.
 
+**Mac kısayolu:** Finder'da dosya veya klasör seçip Finder > Servisler > **QuickShare ile Gönder**'i kullanın. Kısayol atamak için Sistem Ayarları > Klavye > Klavye Kısayolları > Servisler > Dosyalar ve Klasörler bölümünden bu girişe bir kısayol verin. Açık tek cihaz varsa dosyalar sormadan ona gider. Klasörler `.zip` olarak gönderilir.
+
 Alınan dosyalar Android'de `Download/QuickShare`, Mac'te `~/Downloads/QuickShare` klasörüne kaydedilir.
 
 ## Derleme

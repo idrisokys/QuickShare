@@ -38,6 +38,13 @@ targets:
           - CFBundleURLName: io.qs.share.mac
             CFBundleURLSchemes:
               - quickshare
+        NSServices:
+          - NSMenuItem:
+              default: Send with QuickShare
+            NSMessage: sendFiles
+            NSPortName: QuickShare
+            NSSendFileTypes:
+              - public.item
   ShareExt:
     type: app-extension
     platform: macOS

@@ -26,3 +26,6 @@
 "err_connect" = "Bağlanılamadı veya cihaz doğrulanamadı (%@)";
 "err_no_reply" = "Yanıt gelmedi";
 "err_remote" = "Karşı cihaz hata verdi";
+"zipping" = "Sıkıştırılıyor: %@";
+"sent_to" = "%@ cihazına gönderildi";
+"err_zip" = "Klasör sıkıştırılamadı";

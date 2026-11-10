@@ -28,6 +28,8 @@ The apps use the device language: **Turkish** on Turkish devices, **English** ev
 1. Install and open the app on both devices (same network).
 2. Tap a device in the list and pick files, or use **Select files**, drag and drop (Mac), or the Share menu.
 
+**Mac keyboard shortcut:** select files or folders in Finder, then use Finder > Services > **Send with QuickShare**. To give it a shortcut, open System Settings > Keyboard > Keyboard Shortcuts > Services > Files and Folders and set one for it. If only one device is online the files go to it directly. Folders are sent as a `.zip`.
+
 Received files are saved to `Download/QuickShare` (Android) or `~/Downloads/QuickShare` (Mac).
 
 ## Build

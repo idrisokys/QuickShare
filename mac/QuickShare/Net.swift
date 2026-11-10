@@ -170,17 +170,45 @@ final class Receiver {
 }
 
 enum Sender {
-    static func send(_ files: [URL], to p: Peer, done: @escaping (String) -> Void) {
+    static func send(_ items: [URL], to p: Peer, done: @escaping (String) -> Void) {
         DispatchQueue.global().async {
             var msg = L("sent")
             var ok = true
-            for f in files {
-                do { try one(f, p) } catch { ok = false; msg = L("error_fmt", error.localizedDescription); break }
-            }
+            var temps: [URL] = []
+            defer { temps.forEach { try? FileManager.default.removeItem(at: $0) } }
+            do {
+                // Klasörler zip'lenip tek dosya olarak gönderilir.
+                var files: [URL] = []
+                for u in items {
+                    if isDir(u) {
+                        Store.shared.post(L("zipping", u.lastPathComponent))
+                        let z = try zipDir(u)
+                        temps.append(z.deletingLastPathComponent())
+                        files.append(z)
+                    } else { files.append(u) }
+                }
+                for f in files { try one(f, p) }
+            } catch { ok = false; msg = L("error_fmt", error.localizedDescription) }
             if ok { DispatchQueue.main.async { Store.shared.last = p.fp } }
             Store.shared.post(msg)
+            HUD.show(ok ? L("sent_to", p.name) : msg)
             done(msg)
         }
+    }
+
+    private static func zipDir(_ dir: URL) throws -> URL {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let out = tmp.appendingPathComponent(dir.lastPathComponent + ".zip")
+        let pr = Process()
+        pr.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        pr.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", dir.path, out.path]
+        pr.standardOutput = FileHandle.nullDevice
+        pr.standardError = FileHandle.nullDevice
+        try pr.run()
+        pr.waitUntilExit()
+        guard pr.terminationStatus == 0 else { throw QSError(L("err_zip")) }
+        return out
     }
 
     private static func one(_ f: URL, _ p: Peer) throws {

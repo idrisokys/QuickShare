@@ -26,3 +26,6 @@
 "err_connect" = "Could not connect or verify the device (%@)";
 "err_no_reply" = "No response";
 "err_remote" = "The other device reported an error";
+"zipping" = "Compressing: %@";
+"sent_to" = "Sent to %@";
+"err_zip" = "Could not compress the folder";
