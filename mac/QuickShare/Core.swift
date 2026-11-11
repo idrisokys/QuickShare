@@ -45,11 +45,6 @@ final class Store: ObservableObject {
     /// Son kaydedilen dosya; durum yazısına tıklanınca klasörü açmak için.
     @Published var savedURL: URL?
 
-    var last: String? {
-        get { UserDefaults.standard.string(forKey: "last") }
-        set { UserDefaults.standard.set(newValue, forKey: "last") }
-    }
-
     func post(_ s: String, _ p: Double = -1, saved: URL? = nil) {
         DispatchQueue.main.async { self.status = s; self.pct = p; self.savedURL = saved }
     }

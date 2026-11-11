@@ -6,8 +6,6 @@
 "launch_login" = "Açılışta başlat";
 "quit" = "Çık";
 "info" = "Bilgi";
-"send" = "Gönder";
-"cancel" = "İptal";
 "no_device" = "Cihaz bulunamadı";
 "receiving" = "Alınıyor: %@";
 "saved" = "Kaydedildi: %@";

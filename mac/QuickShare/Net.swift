@@ -176,7 +176,6 @@ enum Sender {
                 }
                 for f in files { try one(f, p) }
             } catch { ok = false; msg = L("error_fmt", error.localizedDescription) }
-            if ok { DispatchQueue.main.async { Store.shared.last = p.id } }
             Store.shared.post(msg)
             HUD.show(ok ? L("sent_to", p.name) : msg)
             done(msg)
@@ -223,12 +222,28 @@ enum Sender {
         }
         defer { c.cancel() }
 
+        // En fazla 4 parça (4 MB) aynı anda yolda tutulur: ağ, bir sonraki parça diskten okunurken boşta kalmaz.
+        // NWConnection gönderimleri sırayla iletir, bu yüzden veri sırası bozulmaz.
+        let window = 4
+        let slots = DispatchSemaphore(value: window)
+        let errLock = NSLock()
+        var sendErr: NWError?
+        func pendingError() -> NWError? { errLock.lock(); defer { errLock.unlock() }; return sendErr }
+
         func push(_ d: Data) throws {
-            let s = DispatchSemaphore(value: 0)
-            var e: NWError?
-            c.send(content: d, completion: .contentProcessed { e = $0; s.signal() })
-            s.wait()
-            if let e { throw e }
+            slots.wait()
+            if let e = pendingError() { slots.signal(); throw e }
+            c.send(content: d, completion: .contentProcessed { err in
+                if let err { errLock.lock(); if sendErr == nil { sendErr = err }; errLock.unlock() }
+                slots.signal()
+            })
+        }
+
+        /// Yoldaki tüm parçalar işlenene kadar bekler; hata olduysa fırlatır.
+        func drain() throws {
+            for _ in 0..<window { slots.wait() }
+            for _ in 0..<window { slots.signal() }
+            if let e = pendingError() { throw e }
         }
 
         try push(Data("POST /u HTTP/1.1\r\nX-Name: \(enc)\r\nContent-Length: \(size)\r\nConnection: close\r\n\r\n".utf8))
@@ -242,6 +257,8 @@ enum Sender {
             let pc = size > 0 ? Int(sent * 100 / size) : 0
             if pc != last { last = pc; Store.shared.post(L("sending", name), Double(pc)) }
         }
+
+        try drain()
 
         let rs = DispatchSemaphore(value: 0)
         var resp = ""

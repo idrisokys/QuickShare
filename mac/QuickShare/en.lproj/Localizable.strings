@@ -6,8 +6,6 @@
 "launch_login" = "Launch at login";
 "quit" = "Quit";
 "info" = "Info";
-"send" = "Send";
-"cancel" = "Cancel";
 "no_device" = "No device found";
 "receiving" = "Receiving: %@";
 "saved" = "Saved: %@";

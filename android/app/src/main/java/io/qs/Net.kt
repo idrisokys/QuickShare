@@ -1,7 +1,6 @@
 package io.qs
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -12,7 +11,6 @@ import android.widget.Toast
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
-import java.io.OutputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
@@ -211,7 +209,6 @@ object Sender {
         for (p in ps) {
             try {
                 uris.forEach { one(c, p, it) }
-                Last.id = p.id
             } catch (e: Exception) {
                 if (err == null) err = c.getString(R.string.error_fmt, "${p.name}: ${e.message ?: c.getString(R.string.err_connection)}")
             }

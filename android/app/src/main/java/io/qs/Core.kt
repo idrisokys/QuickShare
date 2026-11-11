@@ -2,7 +2,6 @@ package io.qs
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
@@ -35,15 +34,6 @@ object Peers {
     @Synchronized fun list(): List<Peer> = m.values.distinctBy { it.id }
 }
 
-/** Son gönderim yapılan cihazın kimliği (seçim penceresinde ön seçim için). */
-object Last {
-    private lateinit var sp: SharedPreferences
-    fun init(c: Context) { sp = c.getSharedPreferences("last", 0) }
-    var id: String?
-        get() = sp.getString("id", null)
-        set(v) = sp.edit().putString("id", v).apply()
-}
-
 /** Cihaz kimliği: ilk açılışta üretilen rastgele kimlik (şifreleme / sertifika yok). */
 object Identity {
     lateinit var id: String
@@ -54,7 +44,6 @@ object Identity {
     fun init(c: Context) {
         if (ok) return
         val app = c.applicationContext
-        Last.init(app)
         name = Settings.Global.getString(c.contentResolver, "device_name") ?: Build.MODEL
         val sp = app.getSharedPreferences("identity", 0)
         id = sp.getString("id", null) ?: UUID.randomUUID().toString().replace("-", "")

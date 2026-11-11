@@ -17,12 +17,8 @@
     <string name="error_fmt">Hata: %1$s</string>
     <string name="err_connection">bağlantı hatası</string>
     <string name="no_device">Cihaz bulunamadı</string>
-    <string name="pick_device">Hangi cihaza?</string>
-    <string name="send">Gönder</string>
-    <string name="cancel">İptal</string>
     <string name="err_open">Dosya açılamadı</string>
     <string name="err_size">Dosya boyutu bilinmiyor</string>
-    <string name="err_verify">Cihaz doğrulanamadı</string>
     <string name="err_rejected">Karşı cihaz aktarımı kabul etmedi</string>
     <string name="share_searching">Cihazlar aranıyor…</string>
     <string name="info">Bilgi</string>

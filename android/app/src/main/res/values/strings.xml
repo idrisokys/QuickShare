@@ -17,12 +17,8 @@
     <string name="error_fmt">Error: %1$s</string>
     <string name="err_connection">connection error</string>
     <string name="no_device">No device found</string>
-    <string name="pick_device">Which device?</string>
-    <string name="send">Send</string>
-    <string name="cancel">Cancel</string>
     <string name="err_open">Could not open file</string>
     <string name="err_size">File size is unknown</string>
-    <string name="err_verify">Could not verify the device</string>
     <string name="err_rejected">The other device refused the transfer</string>
     <string name="share_searching">Searching for devices…</string>
     <string name="info">Info</string>
