@@ -26,21 +26,11 @@ import kotlin.concurrent.thread
 private const val TYPE = "_qshare._tcp."
 private const val BUF = 1 shl 20
 
-/** Alınan dosyaların varsayılan konumu: <ana dizin>/QuickShare */
+/** Alınan dosyaların varsayılan konumu: <ana dizin>/Link */
 object SaveDir {
-    fun dir() = File(android.os.Environment.getExternalStorageDirectory(), "QuickShare")
+    fun dir() = File(android.os.Environment.getExternalStorageDirectory(), "Link")
     /** Android 11+ ve "Tüm dosyalara erişim" verilmişse doğrudan ana dizine yazılabilir. */
     fun direct() = android.os.Build.VERSION.SDK_INT >= 30 && android.os.Environment.isExternalStorageManager()
-    /** Aynı ad varsa "ad (1).uzantı" biçiminde yeni ad üretir. */
-    fun unique(d: File, name: String): File {
-        var f = File(d, name)
-        if (!f.exists()) return f
-        val base = name.substringBeforeLast('.', name)
-        val ext = if (name.contains('.')) "." + name.substringAfterLast('.') else ""
-        var i = 1
-        while (f.exists()) { f = File(d, "$base ($i)$ext"); i++ }
-        return f
-    }
 }
 
 /** mDNS (NsdManager): kendini duyurur ve çevredeki cihazları bulur. */
@@ -162,8 +152,8 @@ class Receiver(private val ctx: Context) {
                 val clean = name.substringAfterLast('/').substringAfterLast('\\')
                     .replace(Regex("[\\u0000-\\u001f:*?\"<>|]"), "_").trimStart('.').take(120).ifBlank { "file" }
 
-                // Varsayılan: <ana dizin>/QuickShare (Tüm dosyalara erişim izni varsa).
-                // İzin yoksa Download/QuickShare'e (MediaStore) kaydedilir.
+                // Varsayılan: <ana dizin>/Link (Tüm dosyalara erişim izni varsa).
+                // İzin yoksa Download/Link'e (MediaStore) kaydedilir.
                 val cr = ctx.contentResolver
                 val direct = SaveDir.direct()
                 var file: File? = null
@@ -172,11 +162,18 @@ class Receiver(private val ctx: Context) {
                 val os: OutputStream
                 if (direct) {
                     val d = SaveDir.dir().also { it.mkdirs() }
-                    file = SaveDir.unique(d, clean)
+                    // Aynı adlı dosya varsa üzerine yazılır; önce .part dosyasına yazılır, başarılı olunca yerine konur.
+                    file = File(d, "$clean.part")
                     os = FileOutputStream(file)
                 } else {
+                    // Aynı adlı eski kayıt varsa sil (üzerine yazma); yoksa Android "ad (1)" üretirdi.
+                    try {
+                        cr.delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                            "${MediaStore.Downloads.DISPLAY_NAME}=? AND ${MediaStore.Downloads.RELATIVE_PATH} LIKE ?",
+                            arrayOf(clean, "Download/Link%"))
+                    } catch (e: Exception) { }
                     cv.put(MediaStore.Downloads.DISPLAY_NAME, clean)
-                    cv.put(MediaStore.Downloads.RELATIVE_PATH, "Download/QuickShare")
+                    cv.put(MediaStore.Downloads.RELATIVE_PATH, "Download/Link")
                     cv.put(MediaStore.Downloads.IS_PENDING, 1)
                     uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)!!
                     os = cr.openOutputStream(uri)!!
@@ -199,8 +196,12 @@ class Receiver(private val ctx: Context) {
                     }
                 } finally {
                     if (direct) {
-                        if (ok) MediaScannerConnection.scanFile(ctx, arrayOf(file!!.absolutePath), null, null)
-                        else file!!.delete()
+                        if (ok) {
+                            val dest = File(file!!.parentFile, clean)
+                            dest.delete()
+                            if (file!!.renameTo(dest)) MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath), null, null)
+                            else { file!!.delete(); ok = false }
+                        } else file!!.delete()
                     } else if (ok) {
                         cv.clear(); cv.put(MediaStore.Downloads.IS_PENDING, 0)
                         cr.update(uri!!, cv, null, null)
@@ -264,7 +265,7 @@ object Sender {
         }
         val afd = cr.openAssetFileDescriptor(u, "r") ?: error(c.getString(R.string.err_open))
         val len = afd.length
-        require(len >= 0) { c.getString(R.string.err_size) }
+        if (len < 0) { afd.close(); throw IllegalArgumentException(c.getString(R.string.err_size)) }
         afd.createInputStream().use { ins ->
             (Identity.ssl.socketFactory.createSocket(p.host, p.port) as SSLSocket).use { s ->
                 s.tcpNoDelay = true

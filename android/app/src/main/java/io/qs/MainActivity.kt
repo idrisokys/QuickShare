@@ -39,9 +39,11 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         Identity.init(this)
-        if (Build.VERSION.SDK_INT >= 33)
-            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
-        requestAllFilesAccess()
+        // İki izin penceresi üst üste binmesin: önce bildirim, sonra "Tüm dosyalara erişim".
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 2)
+        else requestAllFilesAccess()
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -138,6 +140,11 @@ class MainActivity : Activity() {
         Shortcuts.update(this)
     }
 
+    override fun onRequestPermissionsResult(rc: Int, p: Array<out String>, r: IntArray) {
+        super.onRequestPermissionsResult(rc, p, r)
+        if (rc == 2) requestAllFilesAccess()
+    }
+
     override fun onActivityResult(rc: Int, res: Int, d: Intent?) {
         super.onActivityResult(rc, res, d)
         if (rc != 1 || res != RESULT_OK || d == null) return
@@ -171,7 +178,7 @@ class MainActivity : Activity() {
         )
     }
 
-    /** Ana dizindeki QuickShare klasörüne yazmak için Android 11+ "Tüm dosyalara erişim" iznini ister. */
+    /** Ana dizindeki Link klasörüne yazmak için Android 11+ "Tüm dosyalara erişim" iznini ister. */
     private fun requestAllFilesAccess() {
         if (Build.VERSION.SDK_INT < 30 || SaveDir.direct()) return
         val pkg = Uri.parse("package:$packageName")

@@ -55,12 +55,13 @@ final class Net {
     }
 }
 
-/// Gelen bağlantı: başlığı oku, dosyayı ~/Downloads/QuickShare içine yaz.
+/// Gelen bağlantı: başlığı oku, dosyayı ~/Link içine yaz.
 final class Receiver {
     private let c: NWConnection
     private var buf = Data()
     private var fh: FileHandle?
     private var path: URL?
+    private var final: URL?
     private var total = 0, got = 0, lastPct = -1
     private var name = "file"
     private var finished = false
@@ -114,10 +115,14 @@ final class Receiver {
         if clean.isEmpty { clean = "file" }
         name = clean
 
-        let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("QuickShare")
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Link")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = Receiver.unique(dir, clean)
+        // Aynı adlı dosya varsa üzerine yazılır; önce .part dosyasına yazılır, başarılı olunca yerine konur.
+        let dest = dir.appendingPathComponent(clean)
+        let url = dir.appendingPathComponent(clean + ".part")
+        try? FileManager.default.removeItem(at: url)
+        final = dest
         guard FileManager.default.createFile(atPath: url.path, contents: nil),
               let h = try? FileHandle(forWritingTo: url) else { finish(false); return }
         fh = h; path = url
@@ -145,7 +150,14 @@ final class Receiver {
         if finished { return }
         finished = true
         try? fh?.close()
-        if !ok, let p = path { try? FileManager.default.removeItem(at: p) }
+        var ok = ok
+        if let p = path {
+            if ok, let d = final {
+                try? FileManager.default.removeItem(at: d)
+                if (try? FileManager.default.moveItem(at: p, to: d)) != nil { path = d } else { ok = false }
+            }
+            if !ok { try? FileManager.default.removeItem(at: p) }
+        }
         if path != nil { Store.shared.post(ok ? L("saved", name) : L("recv_partial"), saved: ok ? path : nil) }
         if reply {
             let st = ok ? "200 OK" : "500 Error"
@@ -154,18 +166,6 @@ final class Receiver {
         } else {
             c.cancel()
         }
-    }
-
-    private static func unique(_ dir: URL, _ name: String) -> URL {
-        var u = dir.appendingPathComponent(name)
-        let ext = u.pathExtension
-        let base = u.deletingPathExtension().lastPathComponent
-        var i = 1
-        while FileManager.default.fileExists(atPath: u.path) {
-            u = dir.appendingPathComponent(ext.isEmpty ? "\(base) (\(i))" : "\(base) (\(i)).\(ext)")
-            i += 1
-        }
-        return u
     }
 }
 

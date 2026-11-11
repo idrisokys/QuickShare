@@ -190,7 +190,7 @@ struct ContentView: View {
                 .font(.caption).foregroundColor(s.savedURL != nil ? .accentColor : .secondary).lineLimit(2)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    // "Kaydedildi" yazısına tıklayınca QuickShare klasörünün içini aç.
+                    // "Kaydedildi" yazısına tıklayınca Link klasörünün içini aç.
                     if let u = s.savedURL { NSWorkspace.shared.open(u.deletingLastPathComponent()) }
                 }
                 .onHover { inside in
