@@ -8,7 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.TextView
 
-/** Sistem paylaş menüsünden gelen dosyaları güvenilir cihaza gönderir. */
+/** Sistem paylaş menüsünden gelen dosyaları ağdaki cihaza gönderir. */
 class ShareActivity : Activity() {
     private var d: Discovery? = null
 

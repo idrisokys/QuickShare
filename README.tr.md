@@ -12,7 +12,7 @@ Uygulamalar cihaz diline uyar: Türkçe cihazlarda **Türkçe**, diğer tüm cih
 - Listedeki her yakın cihaza doğrudan gönderilir: cihaza dokunun, dosyaları seçin, bitti
 - Ağınızdaki cihazlardan gelen dosyalar otomatik kabul edilir
 - Sistemin paylaş menüsünde görünür
-- TLS ile şifreli, cihazlar sertifika parmak iziyle doğrulanır
+- Yerel ağda düz TCP: şifreleme ve el sıkışma yok, aktarım hızlı ve sade
 
 | Klasör | Platform | Not |
 |---|---|---|
@@ -26,7 +26,7 @@ Uygulamalar cihaz diline uyar: Türkçe cihazlarda **Türkçe**, diğer tüm cih
 
 **Mac kısayolu:** Finder'da dosya veya klasör seçip Finder > Servisler > **QuickShare ile Gönder**'i kullanın. Kısayol atamak için Sistem Ayarları > Klavye > Klavye Kısayolları > Servisler > Dosyalar ve Klasörler bölümünden bu girişe bir kısayol verin. Açık tek cihaz varsa dosyalar sormadan ona gider. Klasörler `.zip` olarak gönderilir.
 
-Alınan dosyalar Android'de ana dizindeki `Link` ("Tüm dosyalara erişim" izni gerekir, yoksa `Download/Link`), Mac'te `~/Link` klasörüne kaydedilir.
+Alınan dosyalar Android'de ana dizindeki `Link` ("Tüm dosyalara erişim" izni gerekir; izin yoksa kayıt reddedilir), Mac'te `~/Link` klasörüne kaydedilir.
 
 ## Derleme
 
@@ -52,10 +52,9 @@ GitHub Actions her push'ta iki uygulamayı da derler. `v1.0` gibi bir etiket gö
 
 ## Nasıl çalışır
 
-- Keşif: `_qshare._tcp` mDNS servisi, TXT kayıtları `n` (ad) ve `f` (sertifika SHA-256 parmak izi)
-- Aktarım: karşılıklı TLS, dosya başına tek `POST /u` isteği (ad `X-Name` başlığında)
-- Gönderen, alıcının sertifika parmak izini mDNS ile duyurulan izle karşılaştırır
+- Keşif: `_qshare._tcp` mDNS servisi, TXT kayıtları `n` (ad) ve `i` (rastgele cihaz kimliği)
+- Aktarım: düz TCP, dosya başına tek `POST /u` isteği (ad `X-Name` başlığında)
 
 ## Güvenlik notu
 
-Aynı ağdaki her cihaz size dosya gönderebilir ve dosyalar sorulmadan kaydedilir. Halka açık ağlarda kullanmayın.
+Aktarım şifreli değildir ve aynı ağdaki her cihaz size dosya gönderebilir; dosyalar sorulmadan kaydedilir. Yalnızca ev ağı gibi güvendiğiniz ağlarda kullanın.

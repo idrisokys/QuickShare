@@ -16,7 +16,7 @@ The apps use the device language: **Turkish** on Turkish devices, **English** ev
 - Every nearby device in the list can receive files directly: tap a device, pick files, done
 - Files from devices on your network are accepted automatically
 - Appears in the system Share menu
-- Encrypted with TLS, devices are verified by certificate fingerprint
+- Plain TCP on your local network: no encryption or handshake, so transfers stay fast and simple
 
 | Folder | Platform | Notes |
 |---|---|---|
@@ -30,7 +30,7 @@ The apps use the device language: **Turkish** on Turkish devices, **English** ev
 
 **Mac keyboard shortcut:** select files or folders in Finder, then use Finder > Services > **Send with QuickShare**. To give it a shortcut, open System Settings > Keyboard > Keyboard Shortcuts > Services > Files and Folders and set one for it. If only one device is online the files go to it directly. Folders are sent as a `.zip`.
 
-Received files are saved to `Link` in the internal storage root (Android; needs "All files access", otherwise `Download/Link`) or `~/Link` (Mac).
+Received files are saved to `Link` in the internal storage root (Android; needs "All files access"; saving is refused without the permission) or `~/Link` (Mac).
 
 ## Build
 
@@ -56,10 +56,9 @@ GitHub Actions builds both apps on every push. Push a tag like `v1.0` to attach 
 
 ## How it works
 
-- Discovery: mDNS service `_qshare._tcp` with TXT records `n` (name) and `f` (certificate SHA-256 fingerprint)
-- Transfer: mutual TLS, one `POST /u` request per file (name in the `X-Name` header)
-- The sender checks the receiver's certificate fingerprint against the one announced over mDNS
+- Discovery: mDNS service `_qshare._tcp` with TXT records `n` (name) and `i` (random device ID)
+- Transfer: plain TCP, one `POST /u` request per file (name in the `X-Name` header)
 
 ## Security note
 
-Any device on the same network can send you files, and they are saved without asking. Avoid using the app on public networks.
+Transfers are not encrypted and any device on the same network can send you files, which are saved without asking. Use the app only on a network you trust, such as your home network.

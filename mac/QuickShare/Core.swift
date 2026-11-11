@@ -1,6 +1,4 @@
 import Foundation
-import Security
-import CryptoKit
 import Network
 
 /// Yerelleştirilmiş metin (en / tr).
@@ -14,91 +12,27 @@ struct QSError: LocalizedError {
     var errorDescription: String? { m }
 }
 
-func sha256hex(_ d: Data) -> String {
-    SHA256.hash(data: d).map { String(format: "%02x", $0) }.joined()
-}
-
-/// Cihaz kimliği: ilk açılışta self-signed EC sertifika üretilir (macOS'un kendi openssl'i ile).
-/// Parmak izi = sertifikanın SHA-256'sı (Android sürümüyle aynı yöntem).
+/// Cihaz kimliği: ilk açılışta üretilen rastgele kimlik (şifreleme / sertifika yok).
 enum Identity {
     static let name: String = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
-    static var fp = ""
-    static var identity: SecIdentity!
-    private static let pass = "qs"
-
-    static func setup() throws {
-        let fm = FileManager.default
-        let dir = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("QuickShare")
-        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        let p12 = dir.appendingPathComponent("id.p12")
-
-        if !fm.fileExists(atPath: p12.path) {
-            let tmp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            try fm.createDirectory(at: tmp, withIntermediateDirectories: true)
-            defer { try? fm.removeItem(at: tmp) }
-            let k = tmp.appendingPathComponent("k.pem").path
-            let c = tmp.appendingPathComponent("c.pem").path
-            try run(["ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", k])
-            try run(["req", "-new", "-x509", "-key", k, "-out", c, "-subj", "/CN=QuickShare", "-days", "36500"])
-            try run(["pkcs12", "-export", "-inkey", k, "-in", c, "-out", p12.path, "-passout", "pass:" + pass])
-            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: p12.path)
-        }
-
-        let data = try Data(contentsOf: p12)
-        var items: CFArray?
-        var opts: [String: Any] = [kSecImportExportPassphrase as String: pass]
-        if #available(macOS 15.0, *) {
-            // Anahtar sadece bellekte tutulur, Anahtar Zinciri'ne yazılmaz.
-            opts[kSecImportToMemoryOnly as String] = true
-        } else {
-            // Eski macOS: her açılışta geçici, özel bir anahtar zinciri kullan.
-            let kcDir = dir.appendingPathComponent("kc")
-            try? fm.removeItem(at: kcDir)
-            try fm.createDirectory(at: kcDir, withIntermediateDirectories: true)
-            let kcPass = UUID().uuidString
-            var kc: SecKeychain?
-            let r = SecKeychainCreate(kcDir.appendingPathComponent("tmp.keychain").path,
-                                      UInt32(kcPass.utf8.count), kcPass, false, nil, &kc)
-            guard r == errSecSuccess, let kc else { throw QSError(L("err_keychain", r)) }
-            opts[kSecImportExportKeychain as String] = kc
-        }
-        let st = SecPKCS12Import(data as CFData, opts as CFDictionary, &items)
-        guard st == errSecSuccess,
-              let arr = items as? [[String: Any]],
-              let any = arr.first?[kSecImportItemIdentity as String]
-        else { throw QSError(L("err_identity", st)) }
-        let id = any as! SecIdentity
-        identity = id
-        var cert: SecCertificate?
-        SecIdentityCopyCertificate(id, &cert)
-        guard let cert else { throw QSError(L("err_cert_read")) }
-        fp = sha256hex(SecCertificateCopyData(cert) as Data)
-    }
-
-    private static func run(_ args: [String]) throws {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/openssl")
-        p.arguments = args
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        try p.run()
-        p.waitUntilExit()
-        guard p.terminationStatus == 0 else { throw QSError(L("err_cert_gen")) }
-    }
+    static let id: String = {
+        let d = UserDefaults.standard
+        if let v = d.string(forKey: "deviceId") { return v }
+        let v = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        d.set(v, forKey: "deviceId")
+        return v
+    }()
 }
 
 struct Peer: Identifiable {
-    let fp: String
+    let id: String
     let name: String
     let endpoint: NWEndpoint
-    var id: String { fp }
 }
 
 struct Row: Identifiable {
-    let fp: String
+    let id: String
     let name: String
-    var id: String { fp }
 }
 
 /// Uygulama durumu: bulunan cihazlar, ilerleme.
@@ -121,6 +55,6 @@ final class Store: ObservableObject {
     }
 
     var rows: [Row] {
-        peers.values.sorted { $0.name < $1.name }.map { Row(fp: $0.fp, name: $0.name) }
+        peers.values.sorted { $0.name < $1.name }.map { Row(id: $0.id, name: $0.name) }
     }
 }

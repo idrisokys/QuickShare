@@ -8,8 +8,6 @@
 "info" = "Info";
 "send" = "Send";
 "cancel" = "Cancel";
-"which_device" = "Which device?";
-"confirm_send" = "Send %d file(s)?";
 "no_device" = "No device found";
 "receiving" = "Receiving: %@";
 "saved" = "Saved: %@";
@@ -18,12 +16,8 @@
 "sent" = "Sent";
 "error_fmt" = "Error: %@";
 "start_failed" = "Could not start: %@";
-"err_keychain" = "Could not open temporary keychain (%d)";
-"err_identity" = "Could not load identity (%d)";
-"err_cert_read" = "Could not read certificate";
-"err_cert_gen" = "Could not generate certificate";
 "err_nocon" = "could not connect";
-"err_connect" = "Could not connect or verify the device (%@)";
+"err_connect" = "Could not connect to the device (%@)";
 "err_no_reply" = "No response";
 "err_remote" = "The other device reported an error";
 "zipping" = "Compressing: %@";

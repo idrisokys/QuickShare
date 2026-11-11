@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
-        do { try Identity.setup(); try Net.shared.start() }
+        do { try Net.shared.start() }
         catch { Store.shared.post(L("start_failed", error.localizedDescription)) }
     }
 
@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let items = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems else { return }
         let files = items.filter { $0.name == "p" }.compactMap { $0.value }
             .map { URL(fileURLWithPath: $0) }.filter(isItem)
-        if !files.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(files, confirm: false, tries: 0) } }
+        if !files.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(files, tries: 0) } }
     }
 
     /// Servisler menüsü → "QuickShare ile Gönder" (Info.plist'teki NSServices, NSMessage = sendFiles).
@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let urls = (pboard.readObjects(forClasses: [NSURL.self],
                                        options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
         let items = urls.filter(isItem)
-        if !items.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(items, confirm: false, tries: 0) } }
+        if !items.isEmpty { DispatchQueue.main.async { Store.shared.dispatch(items, tries: 0) } }
     }
 }
 
@@ -104,46 +104,34 @@ enum HUD {
 }
 
 extension Store {
-    /// Cihaz tek ise doğrudan gönderir, birden fazlaysa sordurur. only verilirse sadece o cihaza gider.
-    /// confirm: dış kaynaktan (paylaş menüsü) gelen isteklerde her zaman onay ister.
-    func dispatch(_ files: [URL], confirm: Bool, only: String? = nil, tries: Int = 7) {
-        let ps = peers.values.filter { only == nil || $0.fp == only }.sorted { $0.name < $1.name }
+    /// only verilmezse bulunan tüm cihazlara sırayla gönderir (biri bitince diğerine geçer).
+    func dispatch(_ files: [URL], only: String? = nil, tries: Int = 7) {
+        let ps = peers.values.filter { only == nil || $0.id == only }.sorted { $0.name < $1.name }
         if ps.isEmpty {
             if tries < 10 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.dispatch(files, confirm: confirm, only: only, tries: tries + 1)
+                    self.dispatch(files, only: only, tries: tries + 1)
                 }
             } else { post(L("no_device")); HUD.show(L("no_device")) }
             return
         }
-        var target: Peer? = ps[0]
-        if ps.count > 1 || confirm { target = choose(ps, files, confirm) }
-        guard let t = target else { return }
-        Sender.send(files, to: t) { _ in }
+        sendSeq(files, ps, 0)
     }
 
-    private func choose(_ ps: [Peer], _ files: [URL], _ confirm: Bool) -> Peer? {
-        let a = NSAlert()
-        a.messageText = confirm ? L("confirm_send", files.count) : L("which_device")
-        a.informativeText = files.prefix(5).map { $0.lastPathComponent }.joined(separator: "\n")
-            + (files.count > 5 ? "\n…" : "")
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26))
-        pop.addItems(withTitles: ps.map { $0.name })
-        if let i = ps.firstIndex(where: { $0.fp == last }) { pop.selectItem(at: i) }
-        a.accessoryView = pop
-        a.addButton(withTitle: L("send"))
-        a.addButton(withTitle: L("cancel"))
-        NSApp.activate(ignoringOtherApps: true)
-        return a.runModal() == .alertFirstButtonReturn ? ps[pop.indexOfSelectedItem] : nil
+    private func sendSeq(_ files: [URL], _ ps: [Peer], _ i: Int) {
+        guard i < ps.count else { return }
+        Sender.send(files, to: ps[i]) { _ in
+            DispatchQueue.main.async { self.sendSeq(files, ps, i + 1) }
+        }
     }
 
-    func pickFiles(to fp: String? = nil) {
+    func pickFiles(to id: String? = nil) {
         let p = NSOpenPanel()
         p.allowsMultipleSelection = true
         p.canChooseDirectories = true
         NSApp.activate(ignoringOtherApps: true)
         p.begin { r in
-            if r == .OK { DispatchQueue.main.async { Store.shared.dispatch(p.urls, confirm: false, only: fp) } }
+            if r == .OK { DispatchQueue.main.async { Store.shared.dispatch(p.urls, only: id) } }
         }
     }
 }
@@ -177,7 +165,7 @@ struct ContentView: View {
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
                         .contentShape(Rectangle())
-                        .onTapGesture { s.pickFiles(to: r.fp) }
+                        .onTapGesture { s.pickFiles(to: r.id) }
                     }
                     if s.rows.isEmpty {
                         Text(L("searching")).font(.callout).foregroundColor(.secondary).padding(.top, 20)
@@ -233,7 +221,7 @@ struct ContentView: View {
                     g.leave()
                 }
             }
-            g.notify(queue: .main) { if !urls.isEmpty { s.dispatch(urls, confirm: false) } }
+            g.notify(queue: .main) { if !urls.isEmpty { s.dispatch(urls) } }
             return true
         }
     }

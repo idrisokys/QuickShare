@@ -8,8 +8,6 @@
 "info" = "Bilgi";
 "send" = "Gönder";
 "cancel" = "İptal";
-"which_device" = "Hangi cihaza?";
-"confirm_send" = "%d dosya gönderilsin mi?";
 "no_device" = "Cihaz bulunamadı";
 "receiving" = "Alınıyor: %@";
 "saved" = "Kaydedildi: %@";
@@ -18,12 +16,8 @@
 "sent" = "Gönderildi";
 "error_fmt" = "Hata: %@";
 "start_failed" = "Başlatılamadı: %@";
-"err_keychain" = "Geçici anahtar zinciri açılamadı (%d)";
-"err_identity" = "Kimlik yüklenemedi (%d)";
-"err_cert_read" = "Sertifika okunamadı";
-"err_cert_gen" = "Sertifika üretilemedi";
 "err_nocon" = "bağlantı kurulamadı";
-"err_connect" = "Bağlanılamadı veya cihaz doğrulanamadı (%@)";
+"err_connect" = "Cihaza bağlanılamadı (%@)";
 "err_no_reply" = "Yanıt gelmedi";
 "err_remote" = "Karşı cihaz hata verdi";
 "zipping" = "Sıkıştırılıyor: %@";

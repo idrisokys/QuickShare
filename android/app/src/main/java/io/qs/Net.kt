@@ -2,13 +2,11 @@ package io.qs
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
 import java.io.BufferedReader
@@ -17,10 +15,11 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.net.URLDecoder
 import java.net.URLEncoder
-import javax.net.ssl.SSLServerSocket
-import javax.net.ssl.SSLSocket
 import kotlin.concurrent.thread
 
 private const val TYPE = "_qshare._tcp."
@@ -29,7 +28,7 @@ private const val BUF = 1 shl 20
 /** Alınan dosyaların varsayılan konumu: <ana dizin>/Link */
 object SaveDir {
     fun dir() = File(android.os.Environment.getExternalStorageDirectory(), "Link")
-    /** Android 11+ ve "Tüm dosyalara erişim" verilmişse (Android 10'da depolama izni verilmişse) doğrudan ana dizine yazılabilir. */
+    /** Android 11+: "Tüm dosyalara erişim", Android 10: depolama izni verilmişse ana dizine doğrudan yazılabilir. */
     fun direct(c: Context): Boolean =
         if (android.os.Build.VERSION.SDK_INT >= 30) android.os.Environment.isExternalStorageManager()
         else c.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -43,7 +42,7 @@ class Discovery(c: Context) {
     private var dl: NsdManager.DiscoveryListener? = null
     private val q = ArrayDeque<NsdServiceInfo>()
     private var busy = false
-    private val myName get() = "QS" + Identity.fp.take(10)
+    private val myName get() = "QS" + Identity.id.take(10)
 
     fun register(port: Int) {
         val i = NsdServiceInfo().apply {
@@ -51,7 +50,7 @@ class Discovery(c: Context) {
             serviceType = TYPE
             this.port = port
             setAttribute("n", Identity.name)
-            setAttribute("f", Identity.fp)
+            setAttribute("i", Identity.id)
         }
         rl = object : NsdManager.RegistrationListener {
             override fun onRegistrationFailed(s: NsdServiceInfo?, e: Int) {}
@@ -88,9 +87,9 @@ class Discovery(c: Context) {
         nsd.resolveService(s, object : NsdManager.ResolveListener {
             override fun onResolveFailed(i: NsdServiceInfo?, e: Int) { done() }
             override fun onServiceResolved(i: NsdServiceInfo) {
-                val f = i.attributes["f"]?.toString(Charsets.UTF_8)
+                val f = i.attributes["i"]?.toString(Charsets.UTF_8)
                 val n = i.attributes["n"]?.toString(Charsets.UTF_8)
-                if (f != null && f != Identity.fp && i.host != null)
+                if (f != null && f != Identity.id && i.host != null)
                     { Peers.put(i.serviceName, Peer(f, n ?: "?", i.host, i.port)); Shortcuts.update(app) }
                 done()
             }
@@ -100,17 +99,17 @@ class Discovery(c: Context) {
     @Synchronized private fun done() { busy = false; pump() }
 }
 
-/** TLS sunucu: ağdaki cihazlardan gelen dosyaları kabul eder. */
+/** TCP sunucu: ağdaki cihazlardan gelen dosyaları kabul eder. */
 class Receiver(private val ctx: Context) {
-    private var ss: SSLServerSocket? = null
+    private var ss: ServerSocket? = null
     val port get() = ss!!.localPort
 
     fun start() {
-        val s = (Identity.ssl.serverSocketFactory.createServerSocket(0) as SSLServerSocket)
+        val s = ServerSocket(0)
         ss = s
         thread(isDaemon = true) {
             while (true) {
-                val c = try { s.accept() as SSLSocket } catch (e: Exception) { break }
+                val c = try { s.accept() } catch (e: Exception) { break }
                 thread { handle(c) }
             }
         }
@@ -128,16 +127,15 @@ class Receiver(private val ctx: Context) {
         return sb.toString()
     }
 
-    private fun reply(s: SSLSocket, st: String) {
+    private fun reply(s: Socket, st: String) {
         s.outputStream.write("HTTP/1.1 $st\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
         s.outputStream.flush()
     }
 
-    private fun handle(s: SSLSocket) {
+    private fun handle(s: Socket) {
         s.use {
             try {
                 s.soTimeout = 30000
-                s.startHandshake()
                 val ins = s.inputStream
                 line(ins)
                 var len = -1L
@@ -154,32 +152,13 @@ class Receiver(private val ctx: Context) {
                 val clean = name.substringAfterLast('/').substringAfterLast('\\')
                     .replace(Regex("[\\u0000-\\u001f:*?\"<>|]"), "_").trimStart('.').take(120).ifBlank { "file" }
 
-                // Varsayılan: <ana dizin>/Link (Tüm dosyalara erişim izni varsa).
-                // İzin yoksa Download/Link'e (MediaStore) kaydedilir.
-                val cr = ctx.contentResolver
-                val direct = SaveDir.direct(ctx)
-                var file: File? = null
-                var uri: Uri? = null
-                val cv = ContentValues()
-                val os: OutputStream
-                if (direct) {
-                    val d = SaveDir.dir().also { it.mkdirs() }
-                    // Aynı adlı dosya varsa üzerine yazılır; önce .part dosyasına yazılır, başarılı olunca yerine konur.
-                    file = File(d, "$clean.part")
-                    os = FileOutputStream(file)
-                } else {
-                    // Aynı adlı eski kayıt varsa sil (üzerine yazma); yoksa Android "ad (1)" üretirdi.
-                    try {
-                        cr.delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                            "${MediaStore.Downloads.DISPLAY_NAME}=? AND ${MediaStore.Downloads.RELATIVE_PATH} LIKE ?",
-                            arrayOf(clean, "Download/Link%"))
-                    } catch (e: Exception) { }
-                    cv.put(MediaStore.Downloads.DISPLAY_NAME, clean)
-                    cv.put(MediaStore.Downloads.RELATIVE_PATH, "Download/Link")
-                    cv.put(MediaStore.Downloads.IS_PENDING, 1)
-                    uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)!!
-                    os = cr.openOutputStream(uri)!!
-                }
+                // Kayıt yeri yalnızca <ana dizin>/Link; izin yoksa ya da yazılamazsa alma reddedilir.
+                if (!SaveDir.direct(ctx)) { reply(s, "500 Error"); Bus.set(ctx.getString(R.string.recv_error)); return }
+                val d = SaveDir.dir().also { it.mkdirs() }
+                if (!d.isDirectory) { reply(s, "500 Error"); Bus.set(ctx.getString(R.string.recv_error)); return }
+                // Aynı adlı dosya varsa üzerine yazılır; önce .part dosyasına yazılır, başarılı olunca yerine konur.
+                val file = File(d, "$clean.part")
+                val os = FileOutputStream(file)
                 var ok = false
                 try {
                     os.use { out ->
@@ -197,17 +176,12 @@ class Receiver(private val ctx: Context) {
                         ok = left == 0L
                     }
                 } finally {
-                    if (direct) {
-                        if (ok) {
-                            val dest = File(file!!.parentFile, clean)
-                            dest.delete()
-                            if (file!!.renameTo(dest)) MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath), null, null)
-                            else { file!!.delete(); ok = false }
-                        } else file!!.delete()
-                    } else if (ok) {
-                        cv.clear(); cv.put(MediaStore.Downloads.IS_PENDING, 0)
-                        cr.update(uri!!, cv, null, null)
-                    } else cr.delete(uri!!, null, null)
+                    if (ok) {
+                        val dest = File(d, clean)
+                        dest.delete()
+                        if (file.renameTo(dest)) MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath), null, null)
+                        else { file.delete(); ok = false }
+                    } else file.delete()
                 }
                 reply(s, if (ok) "200 OK" else "500 Error")
                 Bus.set(if (ok) ctx.getString(R.string.saved, clean) else ctx.getString(R.string.recv_partial), -1, ok)
@@ -221,37 +195,28 @@ class Receiver(private val ctx: Context) {
 object Sender {
     /** Cihaz yoksa uyarır, tek ise direkt gönderir, çoksa seçtirir. only verilirse sadece o cihaza gönderir. */
     fun start(a: Activity, uris: List<Uri>, only: String?, fin: () -> Unit) {
-        val ps = Peers.list().filter { only == null || it.fp == only }
-        fun go(p: Peer) = send(a.applicationContext, p, uris) { m ->
-            a.runOnUiThread { Toast.makeText(a, m, Toast.LENGTH_LONG).show(); fin() }
+        val ps = Peers.list().filter { only == null || it.id == only }
+        if (ps.isEmpty()) {
+            Toast.makeText(a, a.getString(R.string.no_device), Toast.LENGTH_LONG).show(); fin()
+            return
         }
-        when {
-            ps.isEmpty() -> {
-                Toast.makeText(a, a.getString(R.string.no_device), Toast.LENGTH_LONG).show(); fin()
-            }
-            ps.size == 1 -> go(ps[0])
-            else -> {
-                var sel = ps.indexOfFirst { it.fp == Last.fp }.coerceAtLeast(0)
-                AlertDialog.Builder(a).setTitle(R.string.pick_device)
-                    .setSingleChoiceItems(ps.map { it.name }.toTypedArray(), sel) { _, w -> sel = w }
-                    .setPositiveButton(R.string.send) { _, _ -> go(ps[sel]) }
-                    .setNegativeButton(R.string.cancel) { _, _ -> fin() }
-                    .setOnCancelListener { fin() }
-                    .show()
-            }
+        // only verilmediyse bulunan tüm cihazlara sırayla gönderir (biri bitince diğerine geçer).
+        send(a.applicationContext, ps, uris) { m ->
+            a.runOnUiThread { Toast.makeText(a, m, Toast.LENGTH_LONG).show(); fin() }
         }
     }
 
-    fun send(c: Context, p: Peer, uris: List<Uri>, done: (String) -> Unit) = thread {
-        var ok = true
-        var msg = c.getString(R.string.sent)
-        try {
-            uris.forEach { one(c, p, it) }
-        } catch (e: Exception) {
-            ok = false
-            msg = c.getString(R.string.error_fmt, e.message ?: c.getString(R.string.err_connection))
+    fun send(c: Context, ps: List<Peer>, uris: List<Uri>, done: (String) -> Unit) = thread {
+        var err: String? = null
+        for (p in ps) {
+            try {
+                uris.forEach { one(c, p, it) }
+                Last.id = p.id
+            } catch (e: Exception) {
+                if (err == null) err = c.getString(R.string.error_fmt, "${p.name}: ${e.message ?: c.getString(R.string.err_connection)}")
+            }
         }
-        if (ok) Last.fp = p.fp
+        val msg = err ?: c.getString(R.string.sent)
         Bus.set(msg)
         done(msg)
     }
@@ -269,12 +234,11 @@ object Sender {
         val len = afd.length
         if (len < 0) { afd.close(); throw IllegalArgumentException(c.getString(R.string.err_size)) }
         afd.createInputStream().use { ins ->
-            (Identity.ssl.socketFactory.createSocket(p.host, p.port) as SSLSocket).use { s ->
+            Socket().use { s ->
+                s.connect(InetSocketAddress(p.host, p.port), 10000)
                 s.tcpNoDelay = true
                 s.sendBufferSize = BUF
                 s.soTimeout = 30000
-                s.startHandshake()
-                require(Identity.fpOf(s.session.peerCertificates[0]) == p.fp) { c.getString(R.string.err_verify) }
                 val out = s.outputStream
                 out.write(
                     ("POST /u HTTP/1.1\r\nX-Name: ${URLEncoder.encode(name, "UTF-8")}\r\n" +

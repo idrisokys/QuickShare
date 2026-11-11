@@ -1,39 +1,26 @@
 import Foundation
 import Network
-import Security
 
-/// mDNS + TLS: Android sürümüyle aynı protokol (_qshare._tcp, POST /u, gönderilen cihazın parmak izi doğrulanır).
+/// mDNS + düz TCP: Android sürümüyle aynı protokol (_qshare._tcp, POST /u). Şifreleme ve kimlik doğrulama yok.
 final class Net {
     static let shared = Net()
     let q = DispatchQueue(label: "qs.net")
     private var listener: NWListener?
     private var browser: NWBrowser?
 
-    func params(verify: @escaping (String) -> Bool) -> NWParameters {
-        let tls = NWProtocolTLS.Options()
-        let so = tls.securityProtocolOptions
-        if let id = sec_identity_create(Identity.identity) {
-            sec_protocol_options_set_local_identity(so, id)
-        }
-        sec_protocol_options_set_peer_authentication_required(so, true)
-        sec_protocol_options_set_verify_block(so, { _, trust, complete in
-            let t = sec_trust_copy_ref(trust).takeRetainedValue()
-            guard let chain = SecTrustCopyCertificateChain(t) as? [SecCertificate],
-                  let c = chain.first else { complete(false); return }
-            complete(verify(sha256hex(SecCertificateCopyData(c) as Data)))
-        }, q)
+    func params() -> NWParameters {
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
-        return NWParameters(tls: tls, tcp: tcp)
+        return NWParameters(tls: nil, tcp: tcp)
     }
 
     func start() throws {
         // Ağdaki her cihazdan gelen bağlantı kabul edilir.
-        let l = try NWListener(using: params { _ in true })
+        let l = try NWListener(using: params())
         l.service = NWListener.Service(
-            name: "QS" + String(Identity.fp.prefix(10)),
+            name: "QS" + String(Identity.id.prefix(10)),
             type: "_qshare._tcp",
-            txtRecord: NWTXTRecord(["n": Identity.name, "f": Identity.fp])
+            txtRecord: NWTXTRecord(["n": Identity.name, "i": Identity.id])
         )
         l.newConnectionHandler = { c in Receiver(c).start() }
         l.start(queue: q)
@@ -44,8 +31,8 @@ final class Net {
             var d: [String: Peer] = [:]
             for r in results {
                 if case .bonjour(let txt) = r.metadata,
-                   let f = txt.dictionary["f"], f != Identity.fp {
-                    d[f] = Peer(fp: f, name: txt.dictionary["n"] ?? "?", endpoint: r.endpoint)
+                   let f = txt.dictionary["i"], f != Identity.id {
+                    d[f] = Peer(id: f, name: txt.dictionary["n"] ?? "?", endpoint: r.endpoint)
                 }
             }
             DispatchQueue.main.async { Store.shared.peers = d }
@@ -189,7 +176,7 @@ enum Sender {
                 }
                 for f in files { try one(f, p) }
             } catch { ok = false; msg = L("error_fmt", error.localizedDescription) }
-            if ok { DispatchQueue.main.async { Store.shared.last = p.fp } }
+            if ok { DispatchQueue.main.async { Store.shared.last = p.id } }
             Store.shared.post(msg)
             HUD.show(ok ? L("sent_to", p.name) : msg)
             done(msg)
@@ -217,7 +204,7 @@ enum Sender {
         let enc = name.addingPercentEncoding(
             withAllowedCharacters: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._*"))) ?? "file"
 
-        let c = NWConnection(to: p.endpoint, using: Net.shared.params { $0 == p.fp })
+        let c = NWConnection(to: p.endpoint, using: Net.shared.params())
         let ready = DispatchSemaphore(value: 0)
         var isReady = false
         var lastErr = L("err_nocon")

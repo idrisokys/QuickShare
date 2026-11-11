@@ -24,7 +24,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    class Row(val fp: String, val name: String)
+    class Row(val id: String, val name: String)
 
     private lateinit var lv: ListView
     private lateinit var st: TextView
@@ -115,7 +115,7 @@ class MainActivity : Activity() {
                 }
             }
             setOnItemClickListener { _, _, i, _ ->
-                target = rows[i].fp
+                target = rows[i].id
                 pickFiles()
             }
         }
@@ -155,9 +155,9 @@ class MainActivity : Activity() {
     }
 
     private fun refresh() {
-        rows = Peers.list().map { Row(it.fp, it.name) }
+        rows = Peers.list().map { Row(it.id, it.name) }
         (lv.adapter as BaseAdapter).notifyDataSetChanged()
-        val key = rows.joinToString { it.fp }
+        val key = rows.joinToString { it.id }
         if (key != shortcutKey) { shortcutKey = key; Shortcuts.update(this) }
         st.setTextColor(if (Bus.saved) 0xFF4FC3F7.toInt() else 0xFFBBBBBB.toInt())
         st.text = when {
@@ -178,7 +178,7 @@ class MainActivity : Activity() {
         )
     }
 
-    /** Ana dizindeki Link klasörüne yazmak için izin ister: Android 11+ "Tüm dosyalara erişim", Android 10'da depolama izni. */
+    /** Ana dizindeki Link klasörüne yazmak için "Tüm dosyalara erişim" iznini (Android 10'da depolama iznini) ister. */
     private fun requestAllFilesAccess() {
         if (SaveDir.direct(this)) return
         if (Build.VERSION.SDK_INT < 30) {
