@@ -29,8 +29,10 @@ private const val BUF = 1 shl 20
 /** Alınan dosyaların varsayılan konumu: <ana dizin>/Link */
 object SaveDir {
     fun dir() = File(android.os.Environment.getExternalStorageDirectory(), "Link")
-    /** Android 11+ ve "Tüm dosyalara erişim" verilmişse doğrudan ana dizine yazılabilir. */
-    fun direct() = android.os.Build.VERSION.SDK_INT >= 30 && android.os.Environment.isExternalStorageManager()
+    /** Android 11+ ve "Tüm dosyalara erişim" verilmişse (Android 10'da depolama izni verilmişse) doğrudan ana dizine yazılabilir. */
+    fun direct(c: Context): Boolean =
+        if (android.os.Build.VERSION.SDK_INT >= 30) android.os.Environment.isExternalStorageManager()
+        else c.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
 }
 
 /** mDNS (NsdManager): kendini duyurur ve çevredeki cihazları bulur. */
@@ -155,7 +157,7 @@ class Receiver(private val ctx: Context) {
                 // Varsayılan: <ana dizin>/Link (Tüm dosyalara erişim izni varsa).
                 // İzin yoksa Download/Link'e (MediaStore) kaydedilir.
                 val cr = ctx.contentResolver
-                val direct = SaveDir.direct()
+                val direct = SaveDir.direct(ctx)
                 var file: File? = null
                 var uri: Uri? = null
                 val cv = ContentValues()

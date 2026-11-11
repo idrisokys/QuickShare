@@ -178,9 +178,13 @@ class MainActivity : Activity() {
         )
     }
 
-    /** Ana dizindeki Link klasörüne yazmak için Android 11+ "Tüm dosyalara erişim" iznini ister. */
+    /** Ana dizindeki Link klasörüne yazmak için izin ister: Android 11+ "Tüm dosyalara erişim", Android 10'da depolama izni. */
     private fun requestAllFilesAccess() {
-        if (Build.VERSION.SDK_INT < 30 || SaveDir.direct()) return
+        if (SaveDir.direct(this)) return
+        if (Build.VERSION.SDK_INT < 30) {
+            requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 3)
+            return
+        }
         val pkg = Uri.parse("package:$packageName")
         try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, pkg)) }
         catch (e: Exception) {
