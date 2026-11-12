@@ -3,7 +3,6 @@
     <string name="app_name">Hızlı Paylaş</string>
     <string name="notif_channel">Bekleme</string>
     <string name="notif_title">Gönderi bekleniyor</string>
-    <string name="ready">%1$s  ·  hazır</string>
     <string name="select_file">Dosya seç</string>
     <string name="searching">Yakındaki cihazlar aranıyor…</string>
     <string name="hint">Dosya göndermek için bir cihaza dokun</string>
@@ -23,4 +22,7 @@
     <string name="share_searching">Cihazlar aranıyor…</string>
     <string name="info">Bilgi</string>
     <string name="link_fail">Link açılamadı</string>
+    <string name="open_folder">Klasör Aç</string>
+    <string name="folder_manual">Klasörü elle açın: %1$s</string>
+    <string name="fm_missing">Dosya yöneticisi (com.alphainventor.filemanager) yüklü değil</string>
 </resources>

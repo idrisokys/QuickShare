@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Outline
+import android.graphics.Typeface
+import android.os.StrictMode
+import java.io.File
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -14,6 +17,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.widget.BaseAdapter
+import android.widget.FrameLayout
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -48,7 +52,6 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(24), dp(24), dp(24))
-            setBackgroundColor(0xFF111111.toInt())
         }
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -81,11 +84,7 @@ class MainActivity : Activity() {
         info.addView(infoText)
 
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(TextView(this).apply {
-            text = this@MainActivity.getString(R.string.ready, Identity.name)
-            textSize = 24f
-            setTextColor(Color.WHITE)
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         val infoBtn = ImageButton(this).apply {
             setImageResource(R.drawable.ic_info)
             setBackgroundColor(Color.TRANSPARENT)
@@ -107,10 +106,12 @@ class MainActivity : Activity() {
                 override fun getView(i: Int, v: View?, p: ViewGroup?): View {
                     val r = rows[i]
                     return ((v as? TextView) ?: TextView(this@MainActivity)).apply {
-                        setPadding(dp(16), dp(16), dp(16), dp(16))
-                        textSize = 20f
+                        setPadding(dp(20), dp(26), dp(20), dp(26))
+                        textSize = 26f
+                        setTypeface(typeface, Typeface.BOLD)
                         text = r.name
                         setTextColor(Color.WHITE)
+                        setShadowLayer(6f, 0f, 2f, 0xCC000000.toInt())
                     }
                 }
             }
@@ -119,7 +120,7 @@ class MainActivity : Activity() {
                 pickFiles()
             }
         }
-        root.addView(lv, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(lv, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(72) })
 
         st = TextView(this).apply {
             textSize = 16f; setTextColor(0xFFBBBBBB.toInt()); setPadding(0, dp(8), 0, dp(8))
@@ -132,8 +133,24 @@ class MainActivity : Activity() {
             setText(R.string.select_file)
             setOnClickListener { target = null; pickFiles() }
         }
-        root.addView(btn, LinearLayout.LayoutParams(-1, dp(64)))
-        setContentView(root)
+        val folderBtn = Button(this).apply {
+            setText(R.string.open_folder)
+            setOnClickListener { openLinkFolder() }
+        }
+        val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        btnRow.addView(btn, LinearLayout.LayoutParams(0, dp(64), 1f).apply { rightMargin = dp(6) })
+        btnRow.addView(folderBtn, LinearLayout.LayoutParams(0, dp(64), 1f).apply { leftMargin = dp(6) })
+        root.addView(btnRow, LinearLayout.LayoutParams(-1, -2))
+
+        val frame = FrameLayout(this).apply { setBackgroundColor(0xFF111111.toInt()) }
+        frame.addView(ImageView(this).apply {
+            setImageResource(R.drawable.app_bg)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }, FrameLayout.LayoutParams(-1, -1))
+        // Yazılar okunsun diye resmin üstüne hafif koyu katman
+        frame.addView(View(this).apply { setBackgroundColor(0x55000000) }, FrameLayout.LayoutParams(-1, -1))
+        frame.addView(root, FrameLayout.LayoutParams(-1, -1))
+        setContentView(frame)
         btn.requestFocus()
 
         startForegroundService(Intent(this, ReceiverService::class.java))
@@ -167,6 +184,36 @@ class MainActivity : Activity() {
         }
         bar.visibility = if (Bus.pct >= 0) View.VISIBLE else View.INVISIBLE
         bar.progress = Bus.pct.coerceAtLeast(0)
+    }
+
+    /** Link klasörünü com.alphainventor.filemanager ile açar. */
+    private fun openLinkFolder() {
+        val pkg = "com.alphainventor.filemanager"
+        val dir = SaveDir.dir()
+        if (!dir.exists()) dir.mkdirs()
+
+        // 1) file:// Uri (Android'in FileUriExposedException kontrolü bu çağrı için kapatılır)
+        try {
+            try { StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build()) } catch (e: Exception) { }
+            startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(dir), "resource/folder")
+                .setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: Exception) { }
+
+        // 2) Depolama sağlayıcısı (DocumentsContract) Uri'si
+        try {
+            val rel = dir.absolutePath.removePrefix(android.os.Environment.getExternalStorageDirectory().absolutePath).trim('/')
+            val uri = android.provider.DocumentsContract.buildDocumentUri(
+                "com.android.externalstorage.documents", "primary:$rel")
+            startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "vnd.android.document/directory")
+                .setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            return
+        } catch (e: Exception) { }
+
+        // 3) En azından dosya yöneticisini aç
+        val launch = packageManager.getLaunchIntentForPackage(pkg)
+        if (launch != null) { startActivity(launch); toast(getString(R.string.folder_manual, dir.absolutePath)) }
+        else toast(getString(R.string.fm_missing))
     }
 
     private fun pickFiles() {
