@@ -25,4 +25,8 @@
     <string name="open_folder">Open folder</string>
     <string name="folder_manual">Open this folder manually: %1$s</string>
     <string name="fm_missing">File manager (com.alphainventor.filemanager) is not installed</string>
+    <string name="tile_label">QuickShare</string>
+    <string name="notif_recv_channel">Received files</string>
+    <string name="notif_received">File received</string>
+    <string name="notif_stop">Stop</string>
 </resources>

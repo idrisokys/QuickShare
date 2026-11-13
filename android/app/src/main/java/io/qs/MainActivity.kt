@@ -153,13 +153,14 @@ class MainActivity : Activity() {
         setContentView(frame)
         btn.requestFocus()
 
-        startForegroundService(Intent(this, ReceiverService::class.java))
+        ReceiverService.start(this)
         Shortcuts.update(this)
+        if (intent.getBooleanExtra("folder", false)) openLinkFolder()
     }
 
     override fun onRequestPermissionsResult(rc: Int, p: Array<out String>, r: IntArray) {
         super.onRequestPermissionsResult(rc, p, r)
-        if (rc == 2) requestAllFilesAccess()
+        if (rc == 2) { requestAllFilesAccess(); ReceiverService.start(this) }
     }
 
     override fun onActivityResult(rc: Int, res: Int, d: Intent?) {
@@ -241,8 +242,5 @@ class MainActivity : Activity() {
 
     override fun onStart() { super.onStart(); Bus.listener = { refresh() }; refresh() }
     override fun onStop() { Bus.listener = null; super.onStop() }
-    override fun onDestroy() {
-        if (isFinishing) stopService(Intent(this, ReceiverService::class.java))
-        super.onDestroy()
-    }
+    // Uygulama kapansa da servis arka planda çalışmaya devam eder.
 }

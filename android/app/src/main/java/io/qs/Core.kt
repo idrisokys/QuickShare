@@ -23,7 +23,9 @@ object Bus {
     /** true ise durum yazısı "Kaydedildi" mesajıdır; tıklayınca klasör açılır. */
     @Volatile var saved = false
     fun changed() { h.post { listener?.invoke() } }
-    fun set(s: String, p: Int = -1, saved: Boolean = false) { status = s; pct = p; this.saved = saved; changed() }
+    /** Arka plan servisi: bildirimi güncellemek için. */
+    @Volatile var sink: ((String, Int) -> Unit)? = null
+    fun set(s: String, p: Int = -1, saved: Boolean = false) { status = s; pct = p; this.saved = saved; changed(); sink?.invoke(s, p) }
 }
 
 /** Ağda bulunan cihazlar. */

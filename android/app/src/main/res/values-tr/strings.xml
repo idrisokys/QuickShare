@@ -25,4 +25,8 @@
     <string name="open_folder">Klasör Aç</string>
     <string name="folder_manual">Klasörü elle açın: %1$s</string>
     <string name="fm_missing">Dosya yöneticisi (com.alphainventor.filemanager) yüklü değil</string>
+    <string name="tile_label">Hızlı Paylaş</string>
+    <string name="notif_recv_channel">Gelen dosyalar</string>
+    <string name="notif_received">Dosya geldi</string>
+    <string name="notif_stop">Durdur</string>
 </resources>
