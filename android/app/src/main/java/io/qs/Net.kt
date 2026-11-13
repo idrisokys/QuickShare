@@ -1,13 +1,17 @@
 package io.qs
 
-import android.app.Activity
+import android.content.ClipData
 import android.content.Context
+import android.content.Intent
 import android.media.MediaScannerConnection
+import android.os.Handler
+import android.os.Looper
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.provider.OpenableColumns
 import android.widget.Toast
+import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
@@ -103,21 +107,27 @@ class Receiver(private val ctx: Context) {
     val port get() = ss!!.localPort
 
     fun start() {
-        val s = ServerSocket(0)
+        // Tampon, bind'dan ÖNCE ayarlanmalı; yoksa büyük TCP penceresi (hız) devreye girmez.
+        val s = ServerSocket().apply {
+            reuseAddress = true
+            receiveBufferSize = BUF
+            bind(InetSocketAddress(0))
+        }
         ss = s
-        thread(isDaemon = true) {
+        thread(isDaemon = true, name = "qs-accept") {
             while (true) {
                 val c = try { s.accept() } catch (e: Exception) { break }
-                thread { handle(c) }
+                thread(isDaemon = true, name = "qs-rx") { handle(c) }
             }
         }
     }
 
     fun stop() { try { ss?.close() } catch (e: Exception) { } }
 
+    /** Başlık satırı okur (en fazla 8 KB; sonsuz satıra karşı korumalı). */
     private fun line(i: InputStream): String {
         val sb = StringBuilder()
-        while (true) {
+        while (sb.length < 8192) {
             val c = i.read()
             if (c < 0 || c == 10) break
             if (c != 13) sb.append(c.toChar())
@@ -131,10 +141,13 @@ class Receiver(private val ctx: Context) {
     }
 
     private fun handle(s: Socket) {
-        s.use {
-            try {
+        Hold.acquire(ctx)
+        try {
+            s.use {
                 s.soTimeout = 30000
-                val ins = s.inputStream
+                s.tcpNoDelay = true
+                // Başlıklar bayt bayt okunduğu için tamponlu akış (sistem çağrısı sayısını düşürür)
+                val ins = BufferedInputStream(s.inputStream, 64 * 1024)
                 line(ins)
                 var len = -1L
                 var name = "file"
@@ -143,7 +156,7 @@ class Receiver(private val ctx: Context) {
                     if (l.isEmpty()) break
                     val k = l.substringBefore(':').lowercase()
                     val v = l.substringAfter(':').trim()
-                    if (k == "content-length") len = v.toLong()
+                    if (k == "content-length") len = v.toLongOrNull() ?: -1L
                     else if (k == "x-name") name = URLDecoder.decode(v, "UTF-8")
                 }
                 if (len < 0) { reply(s, "400 Bad Request"); return }
@@ -153,13 +166,13 @@ class Receiver(private val ctx: Context) {
                 // Kayıt yeri yalnızca <ana dizin>/Link; izin yoksa ya da yazılamazsa alma reddedilir.
                 if (!SaveDir.direct(ctx)) { reply(s, "500 Error"); Bus.set(ctx.getString(R.string.recv_error)); return }
                 val d = SaveDir.dir().also { it.mkdirs() }
-                if (!d.isDirectory) { reply(s, "500 Error"); Bus.set(ctx.getString(R.string.recv_error)); return }
-                // Aynı adlı dosya varsa üzerine yazılır; önce .part dosyasına yazılır, başarılı olunca yerine konur.
+                if (!d.isDirectory || d.usableSpace < len) { reply(s, "507 Insufficient Storage"); Bus.set(ctx.getString(R.string.recv_error)); return }
+
+                // Önce .part dosyasına yazılır, başarılı olunca asıl ada çevrilir (aynı adlı dosyanın üzerine yazar).
                 val file = File(d, "$clean.part")
-                val os = FileOutputStream(file)
                 var ok = false
                 try {
-                    os.use { out ->
+                    FileOutputStream(file).use { out ->
                         val b = ByteArray(BUF)
                         var left = len
                         var last = -1
@@ -169,7 +182,7 @@ class Receiver(private val ctx: Context) {
                             out.write(b, 0, n)
                             left -= n
                             val p = ((len - left) * 100 / len).toInt()
-                            if (p != last) { last = p; Bus.set(ctx.getString(R.string.receiving, clean), p) }
+                            if (p != last) { last = p; Bus.progress(ctx.getString(R.string.receiving, clean), p) }
                         }
                         ok = left == 0L
                     }
@@ -184,59 +197,75 @@ class Receiver(private val ctx: Context) {
                 reply(s, if (ok) "200 OK" else "500 Error")
                 Bus.set(if (ok) ctx.getString(R.string.saved, clean) else ctx.getString(R.string.recv_partial), -1, ok)
                 if (ok) ReceiverService.notifyReceived(ctx, clean)
-            } catch (e: Exception) {
-                Bus.set(ctx.getString(R.string.recv_error))
             }
+        } catch (e: Exception) {
+            Bus.set(ctx.getString(R.string.recv_error))
+        } finally {
+            Hold.release()
         }
     }
 }
 
 object Sender {
-    /** Cihaz yoksa uyarır, tek ise direkt gönderir, çoksa seçtirir. only verilirse sadece o cihaza gönderir. */
-    fun start(a: Activity, uris: List<Uri>, only: String?, fin: () -> Unit) {
-        val ps = Peers.list().filter { only == null || it.id == only }
-        if (ps.isEmpty()) {
-            Toast.makeText(a, a.getString(R.string.no_device), Toast.LENGTH_LONG).show(); fin()
-            return
-        }
-        // only verilmediyse bulunan tüm cihazlara sırayla gönderir (biri bitince diğerine geçer).
-        send(a.applicationContext, ps, uris) { m ->
-            a.runOnUiThread { Toast.makeText(a, m, Toast.LENGTH_LONG).show(); fin() }
-        }
+    /**
+     * Gönderimi arka plan servisine devreder; böylece paylaş ekranı hemen kapanır, aktarım
+     * bildirimde ilerleme çubuğuyla sürer. Dosya okuma izni servise de verilir (ClipData + grant).
+     * only verilirse sadece o cihaza, verilmezse bulunan tüm cihazlara sırayla gönderir.
+     */
+    fun submit(c: Context, uris: List<Uri>, only: String?) {
+        if (uris.isEmpty()) return
+        val clip = ClipData.newRawUri(null, uris[0])
+        for (i in 1 until uris.size) clip.addItem(ClipData.Item(uris[i]))
+        val i = Intent(c, ReceiverService::class.java)
+            .setAction(ReceiverService.ACTION_SEND)
+            .setClipData(clip)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .putExtra("only", only)
+        c.startForegroundService(i)
     }
 
-    fun send(c: Context, ps: List<Peer>, uris: List<Uri>, done: (String) -> Unit) = thread {
-        var err: String? = null
-        for (p in ps) {
-            try {
-                uris.forEach { one(c, p, it) }
-            } catch (e: Exception) {
-                if (err == null) err = c.getString(R.string.error_fmt, "${p.name}: ${e.message ?: c.getString(R.string.err_connection)}")
-            }
+    private fun toast(c: Context, m: String) =
+        Handler(Looper.getMainLooper()).post { Toast.makeText(c, m, Toast.LENGTH_LONG).show() }
+
+    /** Servisin arka plan iş parçacığında çalışır. */
+    fun run(c: Context, only: String?, uris: List<Uri>) {
+        val ps = Peers.list().filter { only == null || it.id == only }
+        if (ps.isEmpty()) {
+            val m = c.getString(R.string.no_device)
+            Bus.set(m); toast(c, m)
+            return
         }
-        val msg = err ?: c.getString(R.string.sent)
-        Bus.set(msg)
-        done(msg)
+        Hold.acquire(c)
+        try {
+            var err: String? = null
+            for (p in ps) for (u in uris) {
+                try { one(c, p, u) }
+                catch (e: Exception) {
+                    if (err == null) err = c.getString(R.string.error_fmt, "${p.name}: ${e.message ?: c.getString(R.string.err_connection)}")
+                }
+            }
+            val msg = err ?: c.getString(R.string.sent)
+            Bus.set(msg); toast(c, msg)
+        } finally { Hold.release() }
     }
 
     private fun one(c: Context, p: Peer, u: Uri) {
         val cr = c.contentResolver
         var name = "file"
-        cr.query(u, null, null, null, null)?.use {
+        cr.query(u, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) {
                 val i = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (i >= 0) name = it.getString(i)
+                if (i >= 0) it.getString(i)?.let { n -> name = n }
             }
         }
         val afd = cr.openAssetFileDescriptor(u, "r") ?: error(c.getString(R.string.err_open))
         val len = afd.length
         if (len < 0) { afd.close(); throw IllegalArgumentException(c.getString(R.string.err_size)) }
         afd.createInputStream().use { ins ->
-            Socket().use { s ->
+            // Tampon, connect'ten ÖNCE ayarlanmalı (TCP pencere ölçekleme)
+            val s = Socket().apply { sendBufferSize = BUF; tcpNoDelay = true; soTimeout = 30000 }
+            s.use {
                 s.connect(InetSocketAddress(p.host, p.port), 10000)
-                s.tcpNoDelay = true
-                s.sendBufferSize = BUF
-                s.soTimeout = 30000
                 val out = s.outputStream
                 out.write(
                     ("POST /u HTTP/1.1\r\nX-Name: ${URLEncoder.encode(name, "UTF-8")}\r\n" +
@@ -251,7 +280,7 @@ object Sender {
                     out.write(b, 0, n)
                     sent += n
                     val pc = if (len > 0) (sent * 100 / len).toInt() else 0
-                    if (pc != last) { last = pc; Bus.set(c.getString(R.string.sending, name), pc) }
+                    if (pc != last) { last = pc; Bus.progress(c.getString(R.string.sending, name), pc) }
                 }
                 out.flush()
                 val l = BufferedReader(InputStreamReader(s.inputStream)).readLine()

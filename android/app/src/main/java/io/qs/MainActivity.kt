@@ -28,7 +28,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    class Row(val id: String, val name: String)
+    data class Row(val id: String, val name: String)
 
     private lateinit var lv: ListView
     private lateinit var st: TextView
@@ -42,6 +42,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        // Bildirimden gelindiyse arayüz açılmadan doğrudan Link klasörü açılır.
+        if (intent.getBooleanExtra("folder", false)) { openLinkFolder(); finish(); return }
         Identity.init(this)
         // İki izin penceresi üst üste binmesin: önce bildirim, sonra "Tüm dosyalara erişim".
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -155,7 +157,6 @@ class MainActivity : Activity() {
 
         ReceiverService.start(this)
         Shortcuts.update(this)
-        if (intent.getBooleanExtra("folder", false)) openLinkFolder()
     }
 
     override fun onRequestPermissionsResult(rc: Int, p: Array<out String>, r: IntArray) {
@@ -169,14 +170,19 @@ class MainActivity : Activity() {
         val uris = mutableListOf<Uri>()
         d.clipData?.let { c -> for (i in 0 until c.itemCount) uris += c.getItemAt(i).uri }
         d.data?.let { if (uris.isEmpty()) uris += it }
-        if (uris.isNotEmpty()) Sender.start(this, uris, target) { }
+        if (uris.isEmpty()) return
+        if (Peers.list().none { target == null || it.id == target }) { toast(getString(R.string.no_device)); return }
+        Sender.submit(this, uris, target)
     }
 
     private fun refresh() {
-        rows = Peers.list().map { Row(it.id, it.name) }
-        (lv.adapter as BaseAdapter).notifyDataSetChanged()
-        val key = rows.joinToString { it.id }
-        if (key != shortcutKey) { shortcutKey = key; Shortcuts.update(this) }
+        val nr = Peers.list().map { Row(it.id, it.name) }
+        if (nr != rows) {                       // liste değişmediyse yeniden çizme (ilerleme sırasında)
+            rows = nr
+            (lv.adapter as BaseAdapter).notifyDataSetChanged()
+            val key = rows.joinToString { it.id }
+            if (key != shortcutKey) { shortcutKey = key; Shortcuts.update(this) }
+        }
         st.setTextColor(if (Bus.saved) 0xFF4FC3F7.toInt() else 0xFFBBBBBB.toInt())
         st.text = when {
             Bus.status.isNotEmpty() -> Bus.status

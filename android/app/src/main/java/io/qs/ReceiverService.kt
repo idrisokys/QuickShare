@@ -9,25 +9,48 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.net.wifi.WifiManager
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Arka planda sürekli dinler. Kalıcı bildirim gösterir:
- * bekleme / "Gönderiliyor: dosya" / "Alınıyor: dosya" + ilerleme çubuğu.
+ * Arka planda sürekli dinler. Kalıcı bildirim: bekleme / "Gönderiliyor: dosya" / "Alınıyor: dosya" + ilerleme.
+ * Gönderimler de burada (tek iş parçacığında, sırayla) yapılır; paylaş ekranı hemen kapanabilir.
  */
 class ReceiverService : Service() {
     private var rx: Receiver? = null
     private var disc: Discovery? = null
-    private var lock: WifiManager.WifiLock? = null
     private val h = Handler(Looper.getMainLooper())
+    private val io = Executors.newSingleThreadExecutor()
+    private val pending = AtomicInteger(0)
     private val back = Runnable { show(getString(R.string.notif_title), -1) }
+
+    // PendingIntent ve Builder bir kez kurulur; ilerleme güncellemelerinde yeniden üretilmez.
+    private val stopPi by lazy {
+        PendingIntent.getService(this, 0, Intent(this, ReceiverService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
+    }
+    private val openPi by lazy {
+        PendingIntent.getActivity(this, 1,
+            Intent(this, MainActivity::class.java).putExtra("folder", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+    private val nb by lazy {
+        Notification.Builder(this, "qs_run")
+            .setSmallIcon(R.drawable.ic_tile)
+            .setContentTitle(getString(R.string.tile_label))
+            .setContentIntent(openPi)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .addAction(Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_tile), getString(R.string.notif_stop), stopPi).build())
+    }
 
     companion object {
         @Volatile var running = false
         const val ACTION_STOP = "io.qs.STOP"
+        const val ACTION_SEND = "io.qs.SEND"
 
         private fun prefs(c: Context) = c.applicationContext.getSharedPreferences("cfg", 0)
         fun enabled(c: Context) = prefs(c).getBoolean("on", true)
@@ -58,9 +81,8 @@ class ReceiverService : Service() {
             nm.createNotificationChannel(NotificationChannel("qs_recv", c.getString(R.string.notif_recv_channel), NotificationManager.IMPORTANCE_HIGH))
         }
 
-        /** Dosya geldiğinde ayrı, sesli/açılır bildirim. Dokununca Link klasörü açılır. */
+        /** Dosya geldiğinde ayrı, açılır bildirim. Dokununca Link klasörü açılır. */
         fun notifyReceived(c: Context, name: String) {
-            channels(c)
             val i = Intent(c, MainActivity::class.java).putExtra("folder", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val pi = PendingIntent.getActivity(c, name.hashCode(), i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val n = Notification.Builder(c, "qs_recv")
@@ -70,29 +92,17 @@ class ReceiverService : Service() {
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .build()
-            c.getSystemService(NotificationManager::class.java).notify(1000 + (System.nanoTime() % 100000).toInt(), n)
+            c.getSystemService(NotificationManager::class.java).notify(1000 + (System.nanoTime() % 100000).toInt().let { if (it < 0) -it else it }, n)
         }
     }
 
     override fun onBind(i: Intent?) = null
 
-    private fun build(text: String, pct: Int): Notification {
-        val stop = PendingIntent.getService(this, 0, Intent(this, ReceiverService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
-        val open = PendingIntent.getActivity(this, 1, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
-        return Notification.Builder(this, "qs_run")
-            .setSmallIcon(R.drawable.ic_tile)
-            .setContentTitle(getString(R.string.tile_label))
-            .setContentText(text)
-            .setContentIntent(open)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .apply { if (pct >= 0) setProgress(100, pct, false) }
-            .addAction(Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_tile), getString(R.string.notif_stop), stop).build())
-            .build()
-    }
-
     private fun show(text: String, pct: Int) {
-        try { getSystemService(NotificationManager::class.java).notify(1, build(text, pct)) } catch (e: Exception) { }
+        try {
+            val n = nb.setContentText(text).setProgress(if (pct >= 0) 100 else 0, pct.coerceAtLeast(0), false).build()
+            getSystemService(NotificationManager::class.java).notify(1, n)
+        } catch (e: Exception) { }
     }
 
     override fun onCreate() {
@@ -100,7 +110,7 @@ class ReceiverService : Service() {
         running = true
         Identity.init(this)
         channels(this)
-        startForeground(1, build(getString(R.string.notif_title), -1), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        startForeground(1, nb.setContentText(getString(R.string.notif_title)).build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
 
         // Gönderme/alma ilerlemesini bildirime yansıt
         Bus.sink = { s, p ->
@@ -111,17 +121,33 @@ class ReceiverService : Service() {
             }
         }
 
-        lock = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
-            .createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "qs").apply { acquire() }
         rx = Receiver(this).also { it.start() }
         disc = Discovery(this).also { it.register(rx!!.port); it.browse() }
     }
 
     override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
-        if (i?.action == ACTION_STOP) {
-            getSharedPreferences("cfg", 0).edit().putBoolean("on", false).apply()
-            stopSelf()
-            return START_NOT_STICKY
+        val it = i ?: return START_STICKY   // sistem yeniden başlatınca intent null gelir
+        when (it.action) {
+            ACTION_STOP -> {
+                getSharedPreferences("cfg", 0).edit().putBoolean("on", false).apply()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_SEND -> {
+                val cd = it.clipData
+                val uris = (0 until (cd?.itemCount ?: 0)).mapNotNull { n -> cd?.getItemAt(n)?.uri }
+                val only = it.getStringExtra("only")
+                if (uris.isNotEmpty()) {
+                    pending.incrementAndGet()
+                    io.execute {
+                        try { Sender.run(this, only, uris) }
+                        finally {
+                            // Kullanıcı dinlemeyi kapattıysa, gönderim bitince servis de kapanır.
+                            if (pending.decrementAndGet() == 0 && !enabled(this)) stopSelf()
+                        }
+                    }
+                }
+            }
         }
         return START_STICKY
     }
@@ -130,8 +156,8 @@ class ReceiverService : Service() {
         running = false
         Bus.sink = null
         h.removeCallbacksAndMessages(null)
+        io.shutdown()
         disc?.stop(); rx?.stop()
-        try { lock?.release() } catch (e: Exception) { }
         super.onDestroy()
     }
 }

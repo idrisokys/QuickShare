@@ -24,13 +24,10 @@
 
         <activity android:name=".MainActivity" android:exported="true">
             <!-- Telefonda ana ekranda/uygulama çekmecesinde görünmez (LAUNCHER yok).
-                 Android TV için LEANBACK_LAUNCHER kalır. Açmak için hızlı ayarlar kutucuğuna uzun bas. -->
+                 Android TV için LEANBACK_LAUNCHER kalır. Yalnızca izinler eksikken kutucuğa dokununca açılır. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>

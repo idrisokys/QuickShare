@@ -8,6 +8,9 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
+import android.net.wifi.WifiManager
 import android.provider.Settings
 import java.net.InetAddress
 import java.util.UUID
@@ -26,6 +29,38 @@ object Bus {
     /** Arka plan servisi: bildirimi güncellemek için. */
     @Volatile var sink: ((String, Int) -> Unit)? = null
     fun set(s: String, p: Int = -1, saved: Boolean = false) { status = s; pct = p; this.saved = saved; changed(); sink?.invoke(s, p) }
+
+    private var lastT = 0L
+    /** İlerleme güncellemesi: en fazla ~4/sn (arayüz ve bildirim boğulmasın), %100 her zaman geçer. */
+    fun progress(s: String, p: Int) {
+        val now = SystemClock.elapsedRealtime()
+        if (p < 100 && now - lastT < 250) return
+        lastT = now
+        set(s, p)
+    }
+}
+
+/** Aktarım sürerken Wi-Fi ve CPU'yu uyanık tutar; aktarım bitince bırakır (boşta pil harcamaz). */
+object Hold {
+    private var n = 0
+    private var wl: WifiManager.WifiLock? = null
+    private var pl: PowerManager.WakeLock? = null
+
+    @Synchronized fun acquire(c: Context) {
+        if (n++ > 0) return
+        val app = c.applicationContext
+        wl = (app.getSystemService(Context.WIFI_SERVICE) as WifiManager)
+            .createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "qs").apply { setReferenceCounted(false); acquire() }
+        pl = (app.getSystemService(Context.POWER_SERVICE) as PowerManager)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "qs:xfer").apply { setReferenceCounted(false); acquire(30 * 60 * 1000L) }
+    }
+
+    @Synchronized fun release() {
+        if (n == 0 || --n > 0) return
+        try { wl?.release() } catch (e: Exception) { }
+        try { pl?.release() } catch (e: Exception) { }
+        wl = null; pl = null
+    }
 }
 
 /** Ağda bulunan cihazlar. */
