@@ -216,11 +216,13 @@ object Sender {
         if (uris.isEmpty()) return
         val clip = ClipData.newRawUri(null, uris[0])
         for (i in 1 until uris.size) clip.addItem(ClipData.Item(uris[i]))
-        val i = Intent(c, ReceiverService::class.java)
-            .setAction(ReceiverService.ACTION_SEND)
-            .setClipData(clip)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            .putExtra("only", only)
+        // Not: Intent.setClipData() Intent döndürmez (void), bu yüzden zincirlenemez.
+        val i = Intent(c, ReceiverService::class.java).apply {
+            action = ReceiverService.ACTION_SEND
+            clipData = clip
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            putExtra("only", only)
+        }
         c.startForegroundService(i)
     }
 
