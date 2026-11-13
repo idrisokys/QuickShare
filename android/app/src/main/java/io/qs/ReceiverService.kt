@@ -51,7 +51,10 @@ class ReceiverService : Service() {
 
         fun channels(c: Context) {
             val nm = c.getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(NotificationChannel("qs", c.getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW))
+            nm.deleteNotificationChannel("qs")
+            nm.createNotificationChannel(NotificationChannel("qs_run", c.getString(R.string.notif_channel), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                setSound(null, null); enableVibration(false); setShowBadge(false)
+            })
             nm.createNotificationChannel(NotificationChannel("qs_recv", c.getString(R.string.notif_recv_channel), NotificationManager.IMPORTANCE_HIGH))
         }
 
@@ -61,7 +64,7 @@ class ReceiverService : Service() {
             val i = Intent(c, MainActivity::class.java).putExtra("folder", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val pi = PendingIntent.getActivity(c, name.hashCode(), i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val n = Notification.Builder(c, "qs_recv")
-                .setSmallIcon(R.drawable.ic)
+                .setSmallIcon(R.drawable.ic_tile)
                 .setContentTitle(c.getString(R.string.notif_received))
                 .setContentText(name)
                 .setContentIntent(pi)
@@ -76,8 +79,8 @@ class ReceiverService : Service() {
     private fun build(text: String, pct: Int): Notification {
         val stop = PendingIntent.getService(this, 0, Intent(this, ReceiverService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
         val open = PendingIntent.getActivity(this, 1, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
-        return Notification.Builder(this, "qs")
-            .setSmallIcon(R.drawable.ic)
+        return Notification.Builder(this, "qs_run")
+            .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle(getString(R.string.tile_label))
             .setContentText(text)
             .setContentIntent(open)
