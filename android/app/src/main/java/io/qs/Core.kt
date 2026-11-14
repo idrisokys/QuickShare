@@ -89,14 +89,18 @@ object Identity {
     }
 }
 
-/** Ağdaki cihazları paylaş menüsünde doğrudan hedef olarak gösterir. */
+/** Ağdaki her cihazı paylaş menüsünde doğrudan hedef olarak gösterir (yalnızca cihaz adı). */
 object Shortcuts {
     fun update(c: Context) {
         try {
             val sm = c.getSystemService(ShortcutManager::class.java)
-            sm.dynamicShortcuts = Peers.list().take(4).map {
-                ShortcutInfo.Builder(c, it.id)
-                    .setShortLabel(it.name.ifBlank { c.getString(R.string.device_default) }.take(25))
+            val limit = (sm.maxShortcutCountPerActivity - sm.manifestShortcuts.size).coerceAtLeast(0)
+            sm.dynamicShortcuts = Peers.list().take(limit).mapIndexed { i, p ->
+                val label = p.name.ifBlank { c.getString(R.string.device_default) }
+                ShortcutInfo.Builder(c, p.id)
+                    .setShortLabel(label)
+                    .setLongLabel(label)
+                    .setRank(i)
                     .setIcon(Icon.createWithResource(c, R.drawable.ic))
                     .setCategories(setOf("io.qs.TARGET"))
                     .setLongLived(true)
