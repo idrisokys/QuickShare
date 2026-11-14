@@ -66,8 +66,10 @@ object Hold {
 /** Ağda bulunan cihazlar. */
 object Peers {
     private val m = LinkedHashMap<String, Peer>()
-    @Synchronized fun put(svc: String, p: Peer) { m[svc] = p; Bus.changed() }
-    @Synchronized fun del(svc: String) { m.remove(svc); Bus.changed() }
+    /** Cihaz listesi değişince (bulundu / kayboldu) arka plan servisini haberdar eder: bildirimi günceller. */
+    @Volatile var onChange: (() -> Unit)? = null
+    @Synchronized fun put(svc: String, p: Peer) { m[svc] = p; Bus.changed(); onChange?.invoke() }
+    @Synchronized fun del(svc: String) { m.remove(svc); Bus.changed(); onChange?.invoke() }
     @Synchronized fun list(): List<Peer> = m.values.distinctBy { it.id }
 }
 
@@ -89,18 +91,14 @@ object Identity {
     }
 }
 
-/** Ağdaki her cihazı paylaş menüsünde doğrudan hedef olarak gösterir (yalnızca cihaz adı). */
+/** Ağdaki cihazları paylaş menüsünde doğrudan hedef olarak gösterir. */
 object Shortcuts {
     fun update(c: Context) {
         try {
             val sm = c.getSystemService(ShortcutManager::class.java)
-            val limit = (sm.maxShortcutCountPerActivity - sm.manifestShortcuts.size).coerceAtLeast(0)
-            sm.dynamicShortcuts = Peers.list().take(limit).mapIndexed { i, p ->
-                val label = p.name.ifBlank { c.getString(R.string.device_default) }
-                ShortcutInfo.Builder(c, p.id)
-                    .setShortLabel(label)
-                    .setLongLabel(label)
-                    .setRank(i)
+            sm.dynamicShortcuts = Peers.list().take(4).map {
+                ShortcutInfo.Builder(c, it.id)
+                    .setShortLabel(it.name.ifBlank { c.getString(R.string.device_default) }.take(25))
                     .setIcon(Icon.createWithResource(c, R.drawable.ic))
                     .setCategories(setOf("io.qs.TARGET"))
                     .setLongLived(true)
